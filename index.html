@@ -5,15 +5,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>NovelAI Studio</title>
-  <link rel="icon"
-    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✍</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✍</text></svg>" />
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -21,91 +18,48 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    *,
-    *::before,
-    *::after {
+    * {
       box-sizing: border-box;
       margin: 0;
-      padding: 0
+      padding: 0;
     }
 
-    html,
-    body,
-    #root {
+    html, body, #root {
       height: 100%;
       width: 100%;
-      overflow: hidden
+      overflow: hidden;
     }
 
     body {
       font-family: Georgia, serif;
       background: #0c0a14;
-      -webkit-tap-highlight-color: transparent
     }
 
-    ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px
-    }
-
-    ::-webkit-scrollbar-track {
-      background: transparent
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: rgba(124, 58, 237, 0.3);
-      border-radius: 999px
-    }
-
+    /* Animaciones */
     @keyframes spin {
-      from {
-        transform: rotate(0deg)
-      }
-
-      to {
-        transform: rotate(360deg)
-      }
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
 
     @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(8px)
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0)
-      }
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    @keyframes savePop {
-      0% {
-        opacity: 0;
-        transform: scale(.8)
-      }
-
-      60% {
-        transform: scale(1.05)
-      }
-
-      100% {
-        opacity: 1;
-        transform: scale(1)
-      }
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(124, 58, 237, 0.3);
+      border-radius: 999px;
     }
 
-    .desk-hover {
-      transition: transform .25s ease, filter .25s ease;
-      cursor: pointer
-    }
-
-    .desk-hover:hover {
-      transform: translateY(-6px) scale(1.03);
-      filter: brightness(1.15)
-    }
-
-    @media(max-width:768px) {
+    @media (max-width: 768px) {
       .app-sidebar {
         position: fixed !important;
         top: 0 !important;
@@ -113,21 +67,17 @@
         left: 0 !important;
         z-index: 300 !important;
         transform: translateX(-100%);
-        transition: transform .28s cubic-bezier(.4, 0, .2, 1);
-        box-shadow: none !important
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
       }
-
       .app-sidebar.open {
         transform: translateX(0) !important;
-        box-shadow: 6px 0 24px rgba(0, 0, 0, 0.35) !important
+        box-shadow: 6px 0 24px rgba(0, 0, 0, 0.35) !important;
       }
-
       .app-main {
-        padding: 60px 16px 80px !important
+        padding: 60px 16px 80px !important;
       }
-
       .two-col {
-        grid-template-columns: 1fr !important
+        grid-template-columns: 1fr !important;
       }
     }
   </style>
@@ -138,9 +88,9 @@
   <script type="text/babel" data-presets="react">
     const { useState, useEffect, useRef, useCallback } = React;
 
-    // ═══════════════════════════════════════════════════════════
+    // ============================================================
     // FIREBASE CONFIG
-    // ═══════════════════════════════════════════════════════════
+    // ============================================================
     firebase.initializeApp({
       apiKey: "AIzaSyD05j95pwiyual-sMUYgwvi1DsZoN2Yb-M",
       authDomain: "novelai-studio-87636.firebaseapp.com",
@@ -153,9 +103,9 @@
     const fbAuth = firebase.auth();
     const fbDb = firebase.firestore();
 
-    // ═══════════════════════════════════════════════════════════
-    // SISTEMA DE GUARDADO CORREGIDO
-    // ═══════════════════════════════════════════════════════════
+    // ============================================================
+    // SISTEMA DE GUARDADO
+    // ============================================================
     const saveBookData = async (uid, bookId, key, value) => {
       if (!uid || !bookId) return false;
       try {
@@ -164,7 +114,6 @@
           .set({ [key]: value, _ts: Date.now() }, { merge: true });
         return true;
       } catch (e) {
-        console.warn('Error guardando:', e);
         return false;
       }
     };
@@ -178,11 +127,11 @@
           localStorage.setItem(`b:${bookId}:${key}`, JSON.stringify(val));
           return val;
         }
-      } catch (e) { }
+      } catch (e) {}
       try {
         const local = localStorage.getItem(`b:${bookId}:${key}`);
         if (local !== null) return JSON.parse(local);
-      } catch (e) { }
+      } catch (e) {}
       return defaultValue;
     };
 
@@ -191,7 +140,7 @@
       localStorage.setItem('library:books', JSON.stringify(library));
       try {
         await fbDb.collection('users').doc(uid).set({ library, _ts: Date.now() }, { merge: true });
-      } catch (e) { }
+      } catch (e) {}
     };
 
     const loadLibrary = async (uid) => {
@@ -203,11 +152,11 @@
           localStorage.setItem('library:books', JSON.stringify(lib));
           return lib;
         }
-      } catch (e) { }
+      } catch (e) {}
       try {
         const local = localStorage.getItem('library:books');
         if (local) return JSON.parse(local);
-      } catch (e) { }
+      } catch (e) {}
       return [];
     };
 
@@ -216,7 +165,7 @@
       if (!uid) return;
       try {
         await fbDb.collection('users').doc(uid).set({ anthropicKey: key }, { merge: true });
-      } catch (e) { }
+      } catch (e) {}
     };
 
     const loadApiKey = async (uid) => {
@@ -228,96 +177,14 @@
             localStorage.setItem('novelai:apikey', key);
             return key;
           }
-        } catch (e) { }
+        } catch (e) {}
       }
       return localStorage.getItem('novelai:apikey') || null;
     };
 
-    // ═══════════════════════════════════════════════════════════
-    // GOOGLE DOCS SYNC
-    // ═══════════════════════════════════════════════════════════
-    const GDOCS_CLIENT_ID = "1095225113205-mp91no1an5vip1fu7526hfrri8pvken3.apps.googleusercontent.com";
-    const GDOCS_SCOPES = "https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file";
-
-    let _gTokenClient = null;
-    let _gAccessToken = null;
-    let _gTokenExpiry = 0;
-
-    function _ensureGDocsToken() {
-      return new Promise((resolve, reject) => {
-        if (_gAccessToken && Date.now() < _gTokenExpiry - 60000) { resolve(_gAccessToken); return; }
-        if (!window.google?.accounts?.oauth2) { reject(new Error("Google Identity Services no cargado aún.")); return; }
-        if (!_gTokenClient) {
-          _gTokenClient = window.google.accounts.oauth2.initTokenClient({
-            client_id: GDOCS_CLIENT_ID,
-            scope: GDOCS_SCOPES,
-            callback: () => { },
-          });
-        }
-        _gTokenClient.callback = (resp) => {
-          if (resp.error) { reject(new Error("Error: " + resp.error)); return; }
-          _gAccessToken = resp.access_token;
-          _gTokenExpiry = Date.now() + (resp.expires_in || 3600) * 1000;
-          resolve(_gAccessToken);
-        };
-        _gTokenClient.requestAccessToken({ prompt: _gAccessToken ? "" : "consent" });
-      });
-    }
-
-    async function _gDocsCreate(title) {
-      const token = await _ensureGDocsToken();
-      const res = await fetch("https://docs.googleapis.com/v1/documents", {
-        method: "POST",
-        headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
-      if (!res.ok) throw new Error("No se pudo crear el documento");
-      const doc = await res.json();
-      return doc.documentId;
-    }
-
-    async function _gDocsWrite(docId, text) {
-      const token = await _ensureGDocsToken();
-      const getRes = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
-        headers: { "Authorization": "Bearer " + token },
-      });
-      if (!getRes.ok) throw new Error("No se pudo leer el documento");
-      const doc = await getRes.json();
-      const content = doc.body?.content || [];
-      const lastEl = content[content.length - 1];
-      const endIndex = lastEl ? (lastEl.endIndex - 1) : 1;
-      const requests = [];
-      if (endIndex > 1) requests.push({ deleteContentRange: { range: { startIndex: 1, endIndex } } });
-      if (text) requests.push({ insertText: { location: { index: 1 }, text } });
-      if (!requests.length) return;
-      await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
-        method: "POST",
-        headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-        body: JSON.stringify({ requests }),
-      });
-    }
-
-    async function _gDocsRead(docId) {
-      const token = await _ensureGDocsToken();
-      const res = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
-        headers: { "Authorization": "Bearer " + token },
-      });
-      if (!res.ok) throw new Error("No se pudo leer el documento");
-      const doc = await res.json();
-      let text = "";
-      for (const el of (doc.body?.content || [])) {
-        if (el.paragraph) {
-          for (const pe of (el.paragraph.elements || [])) {
-            if (pe.textRun?.content) text += pe.textRun.content;
-          }
-        }
-      }
-      return text.trimEnd();
-    }
-
-    // ═══════════════════════════════════════════════════════════
+    // ============================================================
     // API
-    // ═══════════════════════════════════════════════════════════
+    // ============================================================
     async function callAI(messages, system = "", max = 1000, apiKey) {
       if (!apiKey) throw new Error("Sin API key.");
       const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -340,9 +207,9 @@
       return d.content?.map(b => b.text || "").join("\n") || "";
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // CONSTANTS
-    // ═══════════════════════════════════════════════════════════
+    // ============================================================
+    // CONSTANTES
+    // ============================================================
     const BOOK_PALETTE = ["#7c3aed", "#2563eb", "#dc2626", "#059669", "#d97706", "#ec4899", "#0891b2", "#92400e", "#065f46", "#1d4ed8"];
     const randColor = () => BOOK_PALETTE[Math.floor(Math.random() * BOOK_PALETTE.length)];
     const newBookId = () => "book_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
@@ -351,18 +218,12 @@
     const card = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, boxShadow: "0 1px 3px rgba(124,58,237,0.08)" };
     const fIn = { width: "100%", background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: "11px 16px", color: C.text, fontSize: 14, fontFamily: "Georgia,serif", boxSizing: "border-box", outline: "none" };
     const fLb = { display: "block", color: C.mid, fontSize: 12, fontFamily: "Georgia,serif", marginBottom: 6, fontWeight: 500, letterSpacing: "0.02em", textTransform: "uppercase" };
-    const primBtn = d => ({ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 24px", borderRadius: 999, border: "none", background: d ? "#e5e0f5" : C.accent, color: d ? "#a09ab8" : "#fff", cursor: d ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 600 });
+    const primBtn = (disabled) => ({ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 24px", borderRadius: 999, border: "none", background: disabled ? "#e5e0f5" : C.accent, color: disabled ? "#a09ab8" : "#fff", cursor: disabled ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 600 });
     const ghostBtn = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.mid, cursor: "pointer", fontSize: 13 };
-    const pill = (a, sm) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: sm ? "5px 12px" : "8px 18px", borderRadius: 999, border: `1px solid ${a ? C.accent : C.border}`, background: a ? C.aLight : C.surface, color: a ? C.accent : C.mid, cursor: "pointer", fontSize: sm ? 12 : 13, fontWeight: a ? 600 : 400 });
+    const pill = (active, sm) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: sm ? "5px 12px" : "8px 18px", borderRadius: 999, border: `1px solid ${active ? C.accent : C.border}`, background: active ? C.aLight : C.surface, color: active ? C.accent : C.mid, cursor: "pointer", fontSize: sm ? 12 : 13, fontWeight: active ? 600 : 400 });
 
-    const NODE_C = { protagonist: C.green, antagonist: C.red, secondary: C.blue, mentor: C.yellow, other: C.light, lugar: "#0ea5e9", objeto: "#f97316", mitología: "#8b5cf6", otro: "#6b7280", lorebook: "#06b6d4", escena: "#d97706", structure: "#64748b", tema: C.accent, custom: "#374151" };
+    const NODE_C = { protagonist: C.green, antagonist: C.red, secondary: C.blue, mentor: C.yellow, other: C.light };
     const ROLE_LBL = { protagonist: "Protagonista", antagonist: "Antagonista", secondary: "Secundario", mentor: "Mentor", other: "Otro" };
-
-    const PUB_FORMATS = [
-      { id: "libro", icon: "📚", label: "Libro / Novela", color: "#7c3aed", optList: ["Formato editorial", "Revisar estilo", "Normalizar diálogos"] },
-      { id: "cuento", icon: "🧒", label: "Cuento Infantil", color: "#f59e0b", optList: ["Edad 3-6 años", "Edad 7-10 años"] },
-      { id: "blog", icon: "🌐", label: "Blog", color: "#3b82f6", optList: ["Subtítulos", "Tono divulgativo"] },
-    ];
 
     const NAV = [
       { group: "ESCRITURA", items: [{ id: "engine", icon: "⚡", label: "Story Engine" }, { id: "manuscript", icon: "✍", label: "Manuscrito" }] },
@@ -380,7 +241,6 @@
       { id: "metafora", label: "🌿 Metáfora", group: "narrative" }, { id: "ritmo", label: "🥁 Ritmo", group: "narrative" },
     ];
 
-    const EC = { name: "", role: "protagonist", appearance: "", fears: "", secret: "", ghost: "", arcStart: "", arcEnd: "", arcHow: "" };
     const EW = { genre: "", magicRules: "", geography: "", society: "", tone: "" };
     const ES = { premise: "", theme: "", pov: "thirdClose", incitingIncident: "", midpointTwist: "", darkNight: "", climax: "", plotTwists: "" };
     const EE = { title: "", summary: "", goal: "", conflict: "", hook: "" };
@@ -390,24 +250,24 @@
       const [mob, setMob] = useState(window.innerWidth < 768);
       useEffect(() => {
         const h = () => setMob(window.innerWidth < 768);
-        window.addEventListener('resize', h); return () => window.removeEventListener('resize', h);
+        window.addEventListener('resize', h);
+        return () => window.removeEventListener('resize', h);
       }, []);
       return mob;
     }
 
-    function debounce(fn, delay) {
-      let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
-    }
-
-    // ═══════════════════════════════════════════════════════════
+    // ============================================================
     // COMPONENTES UI
-    // ═══════════════════════════════════════════════════════════
+    // ============================================================
     function LoginScreen() {
       const [loading, setLoading] = useState(false);
       const signIn = async () => {
         setLoading(true);
-        try { await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
-        catch (e) { setLoading(false); }
+        try {
+          await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+        } catch (e) {
+          setLoading(false);
+        }
       };
       return (
         <div style={{ width: '100vw', height: '100vh', background: '#0c0a14', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
@@ -431,7 +291,9 @@
         try {
           await callAI([{ role: "user", content: "Di: OK" }], "", 10, key.trim());
           onSave(key.trim());
-        } catch (e) { alert("API key inválida"); }
+        } catch (e) {
+          alert("API key inválida");
+        }
         setTesting(false);
       };
       return (
@@ -483,14 +345,12 @@
       return (
         <div style={{ marginBottom: 16 }}>
           {label && <label style={fLb}>{label}</label>}
-          {ta ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={ph} style={{ ...fIn, minHeight: h, resize: "vertical" }} />
-            : <input value={value} onChange={e => onChange(e.target.value)} placeholder={ph} style={fIn} />}
+          {ta ?
+            <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={ph} style={{ ...fIn, minHeight: h, resize: "vertical" }} /> :
+            <input value={value} onChange={e => onChange(e.target.value)} placeholder={ph} style={fIn} />
+          }
         </div>
       );
-    }
-
-    function AiBtn({ label, onClick, busy }) {
-      return <button onClick={onClick} disabled={busy} style={{ ...pill(false, true), color: C.accent }}>{busy ? "⏳" : "✦"} {label}</button>;
     }
 
     function SecHdr({ title, sub, action }) {
@@ -502,35 +362,31 @@
       );
     }
 
-    // ═══════════════════════════════════════════════════════════
+    // ============================================================
     // DESK SCENE
-    // ═══════════════════════════════════════════════════════════
-    function DeskScene({ library, user, onNewBook, onOpenLibrary, onSettings, onOpenRecent }) {
+    // ============================================================
+    function DeskScene({ library, onNewBook, onOpenLibrary, onSettings, onOpenRecent }) {
       const isMobile = useMobile();
-      if (isMobile) {
-        return (
-          <div style={{ width: "100vw", height: "100vh", background: "#0c0a14", padding: "20px" }}>
-            <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 32, color: "#fdf6e3" }}>Novel<span style={{ color: "#a78bfa" }}>AI</span></div>
-              <button onClick={onSettings} style={{ position: "absolute", top: 20, right: 20, background: "rgba(124,58,237,0.15)", border: "none", borderRadius: 999, padding: "8px 12px", color: "rgba(200,180,255,0.6)" }}>⚙</button>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <button onClick={onNewBook} style={{ background: "#7c3aed20", border: "1px solid #7c3aed40", borderRadius: 20, padding: "22px", textAlign: "left" }}><div style={{ fontSize: 26 }}>✍</div><div style={{ color: "#fdf6e3" }}>Nueva Obra</div></button>
-              <button onClick={onOpenLibrary} style={{ background: "#05966920", border: "1px solid #05966940", borderRadius: 20, padding: "22px", textAlign: "left" }}><div style={{ fontSize: 26 }}>📚</div><div style={{ color: "#fdf6e3" }}>Mis Libros</div></button>
-              {library[0] && <button onClick={() => onOpenRecent(library[0])} style={{ gridColumn: "span 2", background: "#d9770620", border: "1px solid #d9770640", borderRadius: 20, padding: "22px", textAlign: "left" }}><div style={{ fontSize: 26 }}>▶</div><div style={{ color: "#fdf6e3" }}>{library[0].title}</div></button>}
-            </div>
-          </div>
-        );
-      }
       return (
-        <div style={{ width: "100vw", height: "100vh", background: "#0c0a14", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: "100vw", height: "100vh", background: "#0c0a14", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 48, color: "#fdf6e3" }}>Novel<span style={{ color: "#a78bfa" }}>AI</span></div>
+            <div style={{ fontSize: isMobile ? 32 : 48, color: "#fdf6e3" }}>Novel<span style={{ color: "#a78bfa" }}>AI</span></div>
             <div style={{ fontSize: 12, color: "rgba(167,139,250,0.5)", letterSpacing: "0.3em", marginBottom: 40 }}>STUDIO</div>
-            <div style={{ display: "flex", gap: 24 }}>
-              <button onClick={onNewBook} className="desk-hover" style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.4)", borderRadius: 16, padding: "24px 32px", cursor: "pointer" }}><div style={{ fontSize: 32 }}>✍</div><div style={{ color: "#fdf6e3" }}>Nueva Obra</div></button>
-              <button onClick={onOpenLibrary} className="desk-hover" style={{ background: "rgba(5,150,105,0.15)", border: "1px solid rgba(5,150,105,0.4)", borderRadius: 16, padding: "24px 32px", cursor: "pointer" }}><div style={{ fontSize: 32 }}>📚</div><div style={{ color: "#fdf6e3" }}>Biblioteca</div></button>
-              {library[0] && <button onClick={() => onOpenRecent(library[0])} className="desk-hover" style={{ background: "rgba(217,119,6,0.15)", border: "1px solid rgba(217,119,6,0.4)", borderRadius: 16, padding: "24px 32px", cursor: "pointer" }}><div style={{ fontSize: 32 }}>▶</div><div style={{ color: "#fdf6e3" }}>{library[0].title}</div></button>}
+            <div style={{ display: "flex", gap: isMobile ? 14 : 24, flexWrap: "wrap", justifyContent: "center" }}>
+              <button onClick={onNewBook} className="desk-hover" style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.4)", borderRadius: 16, padding: isMobile ? "20px" : "24px 32px", cursor: "pointer" }}>
+                <div style={{ fontSize: isMobile ? 24 : 32 }}>✍</div>
+                <div style={{ color: "#fdf6e3" }}>Nueva Obra</div>
+              </button>
+              <button onClick={onOpenLibrary} className="desk-hover" style={{ background: "rgba(5,150,105,0.15)", border: "1px solid rgba(5,150,105,0.4)", borderRadius: 16, padding: isMobile ? "20px" : "24px 32px", cursor: "pointer" }}>
+                <div style={{ fontSize: isMobile ? 24 : 32 }}>📚</div>
+                <div style={{ color: "#fdf6e3" }}>Biblioteca ({library.length})</div>
+              </button>
+              {library[0] && (
+                <button onClick={() => onOpenRecent(library[0])} className="desk-hover" style={{ background: "rgba(217,119,6,0.15)", border: "1px solid rgba(217,119,6,0.4)", borderRadius: 16, padding: isMobile ? "20px" : "24px 32px", cursor: "pointer" }}>
+                  <div style={{ fontSize: isMobile ? 24 : 32 }}>▶</div>
+                  <div style={{ color: "#fdf6e3" }}>{library[0].title}</div>
+                </button>
+              )}
             </div>
             <button onClick={onSettings} style={{ position: "absolute", top: 24, right: 24, background: "rgba(124,58,237,0.15)", border: "none", borderRadius: 999, padding: "8px 16px", color: "rgba(200,180,255,0.6)", cursor: "pointer" }}>⚙</button>
           </div>
@@ -594,9 +450,9 @@
       );
     }
 
-    // ═══════════════════════════════════════════════════════════
+    // ============================================================
     // MAIN APP
-    // ═══════════════════════════════════════════════════════════
+    // ============================================================
     function App() {
       const isMobile = useMobile();
 
@@ -614,7 +470,6 @@
       const [syncStatus, setSyncStatus] = useState("synced");
       const [view, setView] = useState("engine");
       const [busy, setBusy] = useState(false);
-      const [aiField, setAiField] = useState(null);
       const [toast, setToast] = useState(null);
       const [modal, setModal] = useState(null);
 
@@ -681,10 +536,6 @@
       const [pubBusy, setPubBusy] = useState(false);
       const [pubOpts, setPubOpts] = useState({ tone: "", selOpt: "" });
 
-      // Google Docs
-      const [linkedDocId, setLinkedDocId] = useState(null);
-      const [docSyncStatus, setDocSyncStatus] = useState("idle");
-
       const showToast = msg => { setToast(msg); setTimeout(() => setToast(null), 4500); };
 
       const saveField = useCallback(async (key, value) => {
@@ -716,7 +567,6 @@
         setMapNodes(await loadBookData(user.uid, book.id, "mapnodes", []));
         setMapLinks(await loadBookData(user.uid, book.id, "maplinks", []));
         setArcos(await loadBookData(user.uid, book.id, "arcos", []));
-        setLinkedDocId(await loadBookData(user.uid, book.id, "linkedDocId", null));
         setView("engine");
         setSidebarOpen(false);
       }, [user?.uid]);
@@ -761,16 +611,6 @@
         ctx += "\n## IMPORTANTE ##\nNO inventes personajes nuevos. Usa SOLO los listados arriba.\n";
         return ctx;
       }, [characters, codex, structure, worldData]);
-
-      const aiGenWithContext = async (prompt, sys, setter, key, max = 800) => {
-        if (!apiKey) { showToast("⚠ Configura API Key"); return; }
-        setBusy(true); setAiField(key);
-        try {
-          const r = await callAI([{ role: "user", content: prompt }], buildFullContext() + "\n" + (sys || ""), max, apiKey);
-          setter(r.trim());
-        } catch (e) { showToast("⚠ " + e.message); }
-        setBusy(false); setAiField(null);
-      };
 
       const genEngine = async () => {
         if (!apiKey) { showToast("⚠ Configura API Key"); return; }
@@ -839,7 +679,7 @@
         setBusy(false);
       };
 
-      // CRUD con guardado
+      // CRUD
       const saveCharacters = async (newChars) => { setCharacters(newChars); await saveField("characters", newChars); };
       const saveChar = async (ch) => {
         const n = ch.id ? characters.map(x => x.id === ch.id ? ch : x) : [...characters, { ...ch, id: Date.now().toString() }];
@@ -911,15 +751,18 @@
         return nodes;
       }, [characters, codex, escaleta, arcos, mapNodes]);
 
+      // Efecto del mapa
       useEffect(() => {
-        if (view !== "mapa" || !svgRef.current || !buildAllMapNodes().length) return;
+        if (view !== "mapa" || !svgRef.current) return;
         const allNodes = buildAllMapNodes();
+        if (!allNodes.length) return;
         const filtered = mapFilter === "all" ? allNodes : allNodes.filter(n => ({ cast: "cast", world: "world", plot: "plot" }[mapFilter] === n.group));
         const nodeIds = new Set(filtered.map(n => n.id));
         const links = mapLinks.filter(l => nodeIds.has(l.source) && nodeIds.has(l.target));
         const nodes = filtered.map(n => ({ ...n }));
         const el = svgRef.current;
         const { width: W, height: H } = el.getBoundingClientRect();
+        if (W === 0 || H === 0) return;
         const svg = d3.select(el);
         svg.selectAll("*").remove();
         const defs = svg.append("defs");
@@ -949,6 +792,7 @@
         return () => sim.stop();
       }, [view, buildAllMapNodes, mapLinks, mapFilter]);
 
+      // Publish
       const getSourceText = () => {
         if (pubSource === "manuscript") return manuscript;
         if (pubSource === "synopsis") return synopsis;
@@ -1010,6 +854,10 @@
         e.target.value = "";
       };
 
+      // Google Docs
+      const [linkedDocId, setLinkedDocId] = useState(null);
+      const [docSyncStatus, setDocSyncStatus] = useState("idle");
+
       const handleLinkGoogleDoc = async () => {
         if (!user?.uid || !activeBook) return;
         setDocSyncStatus("syncing");
@@ -1042,6 +890,7 @@
         setDocSyncStatus("idle");
       };
 
+      // Auth
       useEffect(() => {
         const unsub = fbAuth.onAuthStateChanged(async (fbUser) => {
           setUser(fbUser);
@@ -1058,7 +907,7 @@
       }, []);
 
       useEffect(() => {
-        if (activeBook && user?.uid) {
+        if (activeBook && user?.uid && manuscript) {
           const wc = manuscript.split(/\s+/).filter(Boolean).length;
           const updatedLib = library.map(b => b.id === activeBook.id ? { ...b, wordCount: wc, lastEdited: new Date().toISOString() } : b);
           setLibrary(updatedLib);
@@ -1066,39 +915,92 @@
         }
       }, [manuscript]);
 
-      if (!authReady) return <div style={{ width: "100vw", height: "100vh", background: "#0c0a14" }} />;
+      // Pantallas de carga y estados
+      if (!authReady) {
+        return (
+          <div style={{ width: "100vw", height: "100vh", background: "#0c0a14", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ fontSize: 28, color: "#fdf6e3", animation: "spin 1s linear infinite" }}>⟳</div>
+          </div>
+        );
+      }
+
       if (screen === "login") return <LoginScreen />;
       if (screen === "setup") return <ApiKeySetup onSave={handleSaveApiKey} />;
-      if (screen === "home") return (
-        <>
-          <DeskScene library={library} user={user} onNewBook={() => setNewBookType("new")} onOpenLibrary={() => setShowLibrary(true)} onSettings={() => setShowSettings(true)} onOpenRecent={book => book && openBook(book)} />
-          {showLibrary && <LibraryPanel library={library} onOpen={openBook} onDelete={deleteBook} onClose={() => setShowLibrary(false)} />}
-          {newBookType && <NewBookModal onConfirm={createBook} onClose={() => setNewBookType(null)} />}
-          {showSettings && <SettingsModal user={user} currentKey={apiKey} onSave={handleSaveApiKey} onClose={() => setShowSettings(false)} />}
-          {toast && <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: C.accent, color: "#fff", padding: "12px 20px", borderRadius: 999, zIndex: 2000 }}>{toast}</div>}
-        </>
-      );
 
-      // ═══════════════════════════════════════════════════════════
-      // APP SCREEN - VISTAS COMPLETAS
-      // ═══════════════════════════════════════════════════════════
+      if (screen === "home") {
+        return (
+          <>
+            <DeskScene
+              library={library}
+              onNewBook={() => setNewBookType("new")}
+              onOpenLibrary={() => setShowLibrary(true)}
+              onSettings={() => setShowSettings(true)}
+              onOpenRecent={book => book && openBook(book)}
+            />
+            {showLibrary && (
+              <LibraryPanel
+                library={library}
+                onOpen={openBook}
+                onDelete={deleteBook}
+                onClose={() => setShowLibrary(false)}
+              />
+            )}
+            {newBookType && (
+              <NewBookModal
+                onConfirm={createBook}
+                onClose={() => setNewBookType(null)}
+              />
+            )}
+            {showSettings && (
+              <SettingsModal
+                user={user}
+                currentKey={apiKey}
+                onSave={handleSaveApiKey}
+                onClose={() => setShowSettings(false)}
+              />
+            )}
+            {toast && (
+              <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: C.accent, color: "#fff", padding: "12px 20px", borderRadius: 999, zIndex: 2000, whiteSpace: "nowrap" }}>
+                {toast}
+              </div>
+            )}
+          </>
+        );
+      }
+
+      // ============================================================
+      // APP SCREEN (con verificación de activeBook)
+      // ============================================================
+      if (!activeBook) {
+        return (
+          <div style={{ width: "100vw", height: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 32, marginBottom: 16 }}>📖</div>
+              <button onClick={() => setScreen("home")} style={primBtn(false)}>Volver al escritorio</button>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div style={{ display: "flex", height: "100vh", background: C.bg, overflow: "hidden" }}>
           {isMobile && sidebarOpen && <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 299 }} />}
           {isMobile && (
             <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 52, background: C.surface, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", zIndex: 200 }}>
               <button onClick={() => setSidebarOpen(s => !s)} style={{ background: "none", border: "none", fontSize: 20 }}>☰</button>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{activeBook?.title || "NovelAI"}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeBook?.title || "NovelAI"}</div>
               <button onClick={() => setScreen("home")} style={{ background: "none", border: "none", fontSize: 18 }}>🏠</button>
             </div>
           )}
-          <div className={`app-sidebar${isMobile && sidebarOpen ? " open" : ""}`} style={{ width: 210, background: C.surface, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" }}>
+
+          {/* Sidebar */}
+          <div className={`app-sidebar${isMobile && sidebarOpen ? " open" : ""}`} style={{ width: 210, background: C.surface, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", height: "100%", overflowY: "auto", zIndex: 300 }}>
             <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.borderL}`, cursor: "pointer" }} onClick={() => { setScreen("home"); setSidebarOpen(false); }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{ width: 9, height: 9, borderRadius: 2, background: activeBook?.color || C.accent }} />
                 <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{activeBook?.title || "Sin título"}</div>
               </div>
-              <div style={{ fontSize: 10, color: C.light }}>← Escritorio</div>
+              <div style={{ fontSize: 10, color: C.light, marginTop: 2 }}>← Escritorio</div>
             </div>
             <div style={{ padding: "8px 16px", background: C.aSoft, borderBottom: `1px solid ${C.borderL}` }}>
               <div style={{ fontSize: 10, color: savedAt ? C.green : C.light }}>{savedAt ? "✓ Guardado" : "Sin guardar"}</div>
@@ -1108,8 +1010,13 @@
                 <div key={g.group} style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 9, fontWeight: 700, color: C.light, textTransform: "uppercase", padding: "4px 10px" }}>{g.group}</div>
                   {g.items.map(item => (
-                    <button key={item.id} onClick={() => { setView(item.id); if (isMobile) setSidebarOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 12px", width: "100%", background: view === item.id ? C.aLight : "transparent", border: "none", borderRadius: 10, color: view === item.id ? C.accent : C.mid, cursor: "pointer", fontSize: 13, textAlign: "left", fontWeight: view === item.id ? 600 : 400 }}>
-                      <span style={{ fontSize: 14, width: 18 }}>{item.icon}</span><span>{item.label}</span>
+                    <button
+                      key={item.id}
+                      onClick={() => { setView(item.id); if (isMobile) setSidebarOpen(false); }}
+                      style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 12px", width: "100%", background: view === item.id ? C.aLight : "transparent", border: "none", borderRadius: 10, color: view === item.id ? C.accent : C.mid, cursor: "pointer", fontSize: 13, textAlign: "left", fontWeight: view === item.id ? 600 : 400 }}
+                    >
+                      <span style={{ fontSize: 14, width: 18 }}>{item.icon}</span>
+                      <span>{item.label}</span>
                     </button>
                   ))}
                 </div>
@@ -1118,30 +1025,17 @@
             <div style={{ padding: "0 8px 8px" }}>
               <div style={{ display: "flex", gap: 5, marginBottom: 5 }}>
                 <button onClick={exportProject} style={{ flex: 1, padding: "7px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.surface, fontSize: 11 }}>⬇ Export</button>
-                <label style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "7px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.surface, fontSize: 11 }}>
+                <label style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "7px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.surface, fontSize: 11, cursor: "pointer" }}>
                   ⬆ Import<input type="file" accept=".json" onChange={importProject} style={{ display: "none" }} />
                 </label>
               </div>
-              <div style={{ marginBottom: 5, padding: "10px", borderRadius: 10, border: `1px solid ${linkedDocId ? "#0f9d5844" : "rgba(15,157,88,0.2)"}` }}>
-                {!linkedDocId ? (
-                  <button onClick={handleLinkGoogleDoc} style={{ width: "100%", background: "none", border: "none", color: "#0f9d58", fontSize: 11 }}>📄 Vincular Google Doc</button>
-                ) : (
-                  <>
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <button onClick={handlePushToDoc} style={{ flex: 1, padding: "5px", borderRadius: 8, background: "rgba(15,157,88,0.08)", color: "#0a7a45", fontSize: 10 }}>↑ Push</button>
-                      <button onClick={handlePullFromDoc} style={{ flex: 1, padding: "5px", borderRadius: 8, background: "rgba(15,157,88,0.08)", color: "#0a7a45", fontSize: 10 }}>↓ Pull</button>
-                      <button onClick={() => window.open(`https://docs.google.com/document/d/${linkedDocId}/edit`, "_blank")} style={{ flex: 1, padding: "5px", borderRadius: 8, background: "rgba(15,157,88,0.08)", color: "#0a7a45", fontSize: 10 }}>↗ Abrir</button>
-                    </div>
-                    <button onClick={handleUnlinkDoc} style={{ width: "100%", marginTop: 6, padding: "4px", background: "none", border: "none", color: C.light, fontSize: 10 }}>Desvincular</button>
-                  </>
-                )}
-              </div>
-              <button onClick={() => { setShowSettings(true); setSidebarOpen(false); }} style={{ width: "100%", padding: "7px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.light, fontSize: 11 }}>⚙ Ajustes</button>
+              <button onClick={() => { setShowSettings(true); setSidebarOpen(false); }} style={{ width: "100%", padding: "7px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.light, fontSize: 11, cursor: "pointer" }}>⚙ Ajustes</button>
             </div>
           </div>
 
+          {/* Main Content */}
           <div className="app-main" style={{ flex: 1, overflowY: "auto", padding: isMobile ? "60px 16px 80px" : "36px 48px" }}>
-            {/* STORY ENGINE */}
+            {/* Story Engine */}
             {view === "engine" && (
               <div style={{ maxWidth: 760 }}>
                 <SecHdr title="Story Engine" />
@@ -1164,11 +1058,15 @@
                     <button onClick={() => { setManuscript(manuscript + (manuscript ? "\n\n" : "") + prose); saveField("manuscript", manuscript + (manuscript ? "\n\n" : "") + prose); setView("manuscript"); }} style={ghostBtn}>Enviar al Manuscrito →</button>
                   </div>
                 )}
-                {step < 4 && <button onClick={genEngine} disabled={busy || !idea.trim()} style={primBtn(busy || !idea.trim())}>{busy ? "⏳" : "✦ " + ["Generar Sinopsis", "Generar Esquema", "Generar Beats", "Generar Prosa"][step]}</button>}
+                {step < 4 && (
+                  <button onClick={genEngine} disabled={busy || !idea.trim()} style={primBtn(busy || !idea.trim())}>
+                    {busy ? "⏳" : "✦ " + ["Generar Sinopsis", "Generar Esquema", "Generar Beats", "Generar Prosa"][step]}
+                  </button>
+                )}
               </div>
             )}
 
-            {/* MANUSCRITO */}
+            {/* Manuscript */}
             {view === "manuscript" && (
               <div style={{ maxWidth: 820 }}>
                 <SecHdr title="Manuscrito" />
@@ -1186,12 +1084,20 @@
                     </div>
                   </div>
                 )}
-                <textarea ref={taRef} value={manuscript} onChange={async e => { const v = e.target.value; setManuscript(v); await saveField("manuscript", v); }} onMouseUp={handleSel} onKeyUp={handleSel} placeholder="Escribe aquí tu novela…" style={{ width: "100%", minHeight: 500, background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 14, padding: isMobile ? "20px" : "36px", fontSize: isMobile ? 16 : 18, lineHeight: 2, resize: "vertical", outline: "none" }} />
+                <textarea
+                  ref={taRef}
+                  value={manuscript}
+                  onChange={async e => { const v = e.target.value; setManuscript(v); await saveField("manuscript", v); }}
+                  onMouseUp={handleSel}
+                  onKeyUp={handleSel}
+                  placeholder="Escribe aquí tu novela…"
+                  style={{ width: "100%", minHeight: 500, background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 14, padding: isMobile ? "20px" : "36px", fontSize: isMobile ? 16 : 18, lineHeight: 2, resize: "vertical", outline: "none" }}
+                />
                 <div style={{ marginTop: 8, fontSize: 12, color: C.light }}>{manuscript.split(/\s+/).filter(Boolean).length} palabras</div>
               </div>
             )}
 
-            {/* BRAINSTORM */}
+            {/* Brainstorm */}
             {view === "brainstorm" && (
               <div style={{ maxWidth: 680 }}>
                 <SecHdr title="Brainstorm" />
@@ -1207,7 +1113,7 @@
                     {bsResults.map((r, i) => (
                       <div key={i} style={{ padding: "13px 18px", borderBottom: i < bsResults.length - 1 ? `1px solid ${C.borderL}` : "none", display: "flex", justifyContent: "space-between" }}>
                         <span>{r}</span>
-                        <button onClick={() => { const n = bsFavs.includes(r) ? bsFavs.filter(x => x !== r) : [...bsFavs, r]; setBsFavs(n); saveField("bsfavs", n); }} style={{ background: "none", border: "none", fontSize: 17, opacity: bsFavs.includes(r) ? 1 : .2 }}>⭐</button>
+                        <button onClick={() => { const n = bsFavs.includes(r) ? bsFavs.filter(x => x !== r) : [...bsFavs, r]; setBsFavs(n); saveField("bsfavs", n); }} style={{ background: "none", border: "none", fontSize: 17, opacity: bsFavs.includes(r) ? 1 : .2, cursor: "pointer" }}>⭐</button>
                       </div>
                     ))}
                   </div>
@@ -1215,9 +1121,9 @@
               </div>
             )}
 
-            {/* MAPA */}
+            {/* Mapa */}
             {view === "mapa" && (
-              <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+              <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 500 }}>
                 <div style={{ padding: "14px 20px", background: C.surface, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
                   <span style={{ fontWeight: 500 }}>Mapa Mental</span>
                   {[["all", "Todos"], ["cast", "Personajes"], ["world", "Mundo"], ["plot", "Trama"]].map(([f, l]) => (
@@ -1226,10 +1132,10 @@
                   <button onClick={() => setAddNodeForm({ label: "" })} style={ghostBtn}>+ Nodo</button>
                   <button onClick={() => setAddLinkForm({ source: "", target: "", label: "" })} style={ghostBtn}>🔗 Conectar</button>
                 </div>
-                <div style={{ flex: 1, position: "relative", background: C.bg, minHeight: 400 }}>
-                  <svg ref={svgRef} style={{ width: "100%", height: "100%" }} />
+                <div style={{ flex: 1, position: "relative", background: C.bg }}>
+                  <svg ref={svgRef} style={{ width: "100%", height: "100%", minHeight: 400 }} />
                   {buildAllMapNodes().length === 0 && (
-                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.light }}>
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.light, pointerEvents: "none" }}>
                       Añade personajes o codex para ver el mapa
                     </div>
                   )}
@@ -1237,10 +1143,13 @@
               </div>
             )}
 
-            {/* TABLERO */}
+            {/* Planning (Tablero) */}
             {view === "planning" && (
               <div style={{ maxWidth: 720 }}>
                 <SecHdr title="Tablero" action={<button onClick={addCh} style={primBtn(false)}>+ Capítulo</button>} />
+                {chapters.length === 0 && (
+                  <div style={{ ...card, textAlign: "center", padding: 48, color: C.light }}>Crea tu primer capítulo</div>
+                )}
                 {chapters.map((ch, idx) => (
                   <div key={ch.id} style={{ ...card, marginBottom: 10, padding: "14px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -1249,7 +1158,7 @@
                       <select value={ch.status} onChange={e => updCh(ch.id, { status: e.target.value })} style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11 }}>
                         <option value="draft">Borrador</option><option value="wip">En progreso</option><option value="done">Listo</option>
                       </select>
-                      <button onClick={() => delCh(ch.id)} style={{ background: "none", border: "none", fontSize: 14 }}>✕</button>
+                      <button onClick={() => delCh(ch.id)} style={{ background: "none", border: "none", fontSize: 14, cursor: "pointer" }}>✕</button>
                     </div>
                     <textarea value={ch.notes || ""} onChange={e => updCh(ch.id, { notes: e.target.value })} placeholder="Notas..." style={{ ...fIn, minHeight: 60, fontSize: 13 }} />
                   </div>
@@ -1257,10 +1166,13 @@
               </div>
             )}
 
-            {/* ESCALETA */}
+            {/* Escaleta */}
             {view === "escaleta" && (
               <div style={{ maxWidth: 720 }}>
                 <SecHdr title="Escaleta" action={<button onClick={() => setEscaletaForm({ ...EE })} style={primBtn(false)}>+ Escena</button>} />
+                {escaleta.length === 0 && (
+                  <div style={{ ...card, textAlign: "center", padding: 48, color: C.light }}>Crea tu primera escena</div>
+                )}
                 {escaleta.map((e, i) => (
                   <div key={e.id} style={{ ...card, marginBottom: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
@@ -1268,7 +1180,10 @@
                         <span style={{ width: 26, height: 26, borderRadius: 999, background: C.aLight, color: C.accent, display: "flex", alignItems: "center", justifyContent: "center" }}>{i + 1}</span>
                         <span style={{ fontWeight: 600 }}>{e.title || "Sin título"}</span>
                       </div>
-                      <div><button onClick={() => setEscaletaForm({ ...e })} style={ghostBtn}>✏</button><button onClick={() => delEsc(e.id)} style={{ ...ghostBtn, color: C.red }}>✕</button></div>
+                      <div>
+                        <button onClick={() => setEscaletaForm({ ...e })} style={ghostBtn}>✏</button>
+                        <button onClick={() => delEsc(e.id)} style={{ ...ghostBtn, color: C.red, marginLeft: 5 }}>✕</button>
+                      </div>
                     </div>
                     {e.summary && <p style={{ color: C.mid, fontSize: 13 }}>{e.summary}</p>}
                   </div>
@@ -1276,13 +1191,13 @@
               </div>
             )}
 
-            {/* ESTRUCTURA */}
+            {/* Estructura */}
             {view === "structure" && (
               <div style={{ maxWidth: 780 }}>
                 <SecHdr title="Estructura" />
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                  <div style={card}><Fld label="Premisa" value={structure.premise} onChange={async v => { setStructure({ ...structure, premise: v }); await saveStructure({ ...structure, premise: v }); }} ta h={80} /><AiBtn label="Generar" busy={busy && aiField === "premise"} onClick={() => aiGenWithContext("Genera una premisa atractiva", "", v => setStructure({ ...structure, premise: v }), "premise")} /></div>
-                  <div style={card}><Fld label="Tema" value={structure.theme} onChange={async v => { setStructure({ ...structure, theme: v }); await saveStructure({ ...structure, theme: v }); }} ta h={80} /><AiBtn label="Generar" busy={busy && aiField === "theme"} onClick={() => aiGenWithContext("Identifica el tema central", "", v => setStructure({ ...structure, theme: v }), "theme")} /></div>
+                  <div style={card}><Fld label="Premisa" value={structure.premise} onChange={async v => { setStructure({ ...structure, premise: v }); await saveStructure({ ...structure, premise: v }); }} ta h={80} /></div>
+                  <div style={card}><Fld label="Tema" value={structure.theme} onChange={async v => { setStructure({ ...structure, theme: v }); await saveStructure({ ...structure, theme: v }); }} ta h={80} /></div>
                   <div style={card}><Fld label="Incidente Incitador" value={structure.incitingIncident} onChange={async v => { setStructure({ ...structure, incitingIncident: v }); await saveStructure({ ...structure, incitingIncident: v }); }} ta h={80} /></div>
                   <div style={card}><Fld label="Punto de Giro" value={structure.midpointTwist} onChange={async v => { setStructure({ ...structure, midpointTwist: v }); await saveStructure({ ...structure, midpointTwist: v }); }} ta h={80} /></div>
                   <div style={card}><Fld label="Noche Oscura" value={structure.darkNight} onChange={async v => { setStructure({ ...structure, darkNight: v }); await saveStructure({ ...structure, darkNight: v }); }} ta h={80} /></div>
@@ -1292,16 +1207,16 @@
               </div>
             )}
 
-            {/* PERSONAJES */}
+            {/* Personajes */}
             {view === "characters" && (
               <div style={{ maxWidth: 860 }}>
-                <SecHdr title="Personajes" action={<button onClick={() => setCharForm({ ...EC })} style={primBtn(false)}>+ Personaje</button>} />
+                <SecHdr title="Personajes" action={<button onClick={() => setCharForm({ name: "", role: "protagonist", appearance: "", fears: "", secret: "", ghost: "", arcStart: "", arcEnd: "", arcHow: "" })} style={primBtn(false)}>+ Personaje</button>} />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 14 }}>
                   {characters.map(ch => (
                     <div key={ch.id} style={card}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                        <div><div style={{ fontSize: 16, fontWeight: 600 }}>{ch.name || "Sin nombre"}</div><Tag color={NODE_C[ch.role]}>{ROLE_LBL[ch.role]}</Tag></div>
-                        <div><button onClick={() => setCharForm({ ...ch })} style={ghostBtn}>✏</button><button onClick={() => delChar(ch.id)} style={{ ...ghostBtn, color: C.red }}>✕</button></div>
+                        <div><div style={{ fontSize: 16, fontWeight: 600 }}>{ch.name || "Sin nombre"}</div><span style={pill(true, true)}>{ROLE_LBL[ch.role] || ch.role}</span></div>
+                        <div><button onClick={() => setCharForm(ch)} style={ghostBtn}>✏</button><button onClick={() => delChar(ch.id)} style={{ ...ghostBtn, color: C.red, marginLeft: 5 }}>✕</button></div>
                       </div>
                       {ch.appearance && <p style={{ color: C.mid, fontSize: 13 }}>{ch.appearance}</p>}
                     </div>
@@ -1310,7 +1225,7 @@
               </div>
             )}
 
-            {/* MUNDO */}
+            {/* Mundo */}
             {view === "world" && (
               <div style={{ maxWidth: 780 }}>
                 <SecHdr title="Mundo" />
@@ -1323,7 +1238,7 @@
               </div>
             )}
 
-            {/* VOZ */}
+            {/* Voz & Técnica */}
             {view === "voice" && (
               <div style={{ maxWidth: 780 }}>
                 <SecHdr title="Voz y Técnica" />
@@ -1341,10 +1256,11 @@
               </div>
             )}
 
-            {/* CODEX */}
+            {/* Codex */}
             {view === "codex" && (
               <div style={{ maxWidth: 720 }}>
                 <SecHdr title="Codex" action={<button onClick={() => setCodexForm({ name: "", type: "personaje", desc: "" })} style={primBtn(false)}>+ Añadir</button>} />
+                {codex.length === 0 && <div style={{ ...card, textAlign: "center", padding: 48, color: C.light }}>El Codex está vacío</div>}
                 {["personaje", "lugar", "objeto", "mitología", "otro"].map(type => {
                   const entries = codex.filter(e => e.type === type);
                   if (!entries.length) return null;
@@ -1354,7 +1270,7 @@
                       {entries.map(e => (
                         <div key={e.id} style={{ ...card, marginBottom: 8, display: "flex", justifyContent: "space-between" }}>
                           <div><div style={{ fontWeight: 600 }}>{e.name}</div><div style={{ color: C.mid, fontSize: 13 }}>{e.desc}</div></div>
-                          <div><button onClick={() => setCodexForm({ ...e })} style={ghostBtn}>✏</button><button onClick={() => delCodex(e.id)} style={{ ...ghostBtn, color: C.red }}>✕</button></div>
+                          <div><button onClick={() => setCodexForm(e)} style={ghostBtn}>✏</button><button onClick={() => delCodex(e.id)} style={{ ...ghostBtn, color: C.red, marginLeft: 5 }}>✕</button></div>
                         </div>
                       ))}
                     </div>
@@ -1363,58 +1279,79 @@
               </div>
             )}
 
-            {/* LOREBOOK */}
+            {/* Lorebook */}
             {view === "lorebook" && (
               <div style={{ maxWidth: 720 }}>
                 <SecHdr title="Lorebook" action={<button onClick={() => setLbForm({ kws: "", content: "" })} style={primBtn(false)}>+ Añadir</button>} />
+                {lorebook.length === 0 && <div style={{ ...card, textAlign: "center", padding: 48, color: C.light }}>El Lorebook está vacío</div>}
                 {lorebook.map(e => (
                   <div key={e.id} style={{ ...card, marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
-                    <div><div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>{(e.keywords || []).map(kw => <Tag key={kw}>{kw}</Tag>)}</div><div style={{ color: C.mid, fontSize: 13 }}>{e.content}</div></div>
-                    <div><button onClick={() => setLbForm({ ...e, kws: (e.keywords || []).join(", ") })} style={ghostBtn}>✏</button><button onClick={() => delLb(e.id)} style={{ ...ghostBtn, color: C.red }}>✕</button></div>
+                    <div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                        {(e.keywords || []).map(kw => <span key={kw} style={pill(true, true)}>{kw}</span>)}
+                      </div>
+                      <div style={{ color: C.mid, fontSize: 13 }}>{e.content}</div>
+                    </div>
+                    <div>
+                      <button onClick={() => setLbForm({ ...e, kws: (e.keywords || []).join(", ") })} style={ghostBtn}>✏</button>
+                      <button onClick={() => delLb(e.id)} style={{ ...ghostBtn, color: C.red, marginLeft: 5 }}>✕</button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* ARCOS ARGUMENTALES */}
+            {/* Arcos Argumentales */}
             {view === "arcos" && (
               <div style={{ maxWidth: 860 }}>
                 <SecHdr title="Arcos Argumentales" sub="La evolución de tus personajes" action={<button onClick={() => setArcosForm({ ...ARCO_DEFAULT, id: "", characterId: "", characterName: "" })} style={primBtn(false)}>+ Arco</button>} />
-                {arcos.length === 0 && <div style={{ ...card, textAlign: "center", padding: 48, color: C.light }}>Crea arcos argumentales para tus personajes.</div>}
+                {arcos.length === 0 && (
+                  <div style={{ ...card, textAlign: "center", padding: 48, color: C.light }}>
+                    Crea arcos argumentales para tus personajes
+                  </div>
+                )}
                 {arcos.map(arco => {
                   const personaje = characters.find(c => c.id === arco.characterId);
                   return (
                     <div key={arco.id} style={{ ...card, marginBottom: 16 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                        <div><div style={{ fontSize: 18, fontWeight: 600, color: C.accent }}>{arco.title || "Arco sin título"}</div><div style={{ fontSize: 12, color: C.mid }}>{personaje?.name || arco.characterName || "Personaje no seleccionado"}</div></div>
-                        <div><button onClick={() => setArcosForm({ ...arco })} style={ghostBtn}>✏</button><button onClick={() => delArco(arco.id)} style={{ ...ghostBtn, color: C.red }}>✕</button></div>
+                        <div>
+                          <div style={{ fontSize: 18, fontWeight: 600, color: C.accent }}>{arco.title || "Arco sin título"}</div>
+                          <div style={{ fontSize: 12, color: C.mid }}>{personaje?.name || arco.characterName || "Personaje no seleccionado"}</div>
+                        </div>
+                        <div>
+                          <button onClick={() => setArcosForm(arco)} style={ghostBtn}>✏</button>
+                          <button onClick={() => delArco(arco.id)} style={{ ...ghostBtn, color: C.red, marginLeft: 5 }}>✕</button>
+                        </div>
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                         <div style={{ background: C.bg, borderRadius: 10, padding: 12 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: C.accent }}>ACTO I</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginBottom: 4 }}>ACTO I</div>
                           <p style={{ fontSize: 12, color: C.mid }}>{arco.act1Desc || "—"}</p>
-                          {arco.act1Conflict && <p style={{ fontSize: 11, color: C.red }}>⚔ {arco.act1Conflict}</p>}
+                          {arco.act1Conflict && <p style={{ fontSize: 11, color: C.red, marginTop: 4 }}>⚔ {arco.act1Conflict}</p>}
                         </div>
                         <div style={{ background: C.bg, borderRadius: 10, padding: 12 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: C.yellow }}>ACTO II</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: C.yellow, marginBottom: 4 }}>ACTO II</div>
                           <p style={{ fontSize: 12, color: C.mid }}>{arco.act2Desc || "—"}</p>
-                          {arco.act2Midpoint && <p style={{ fontSize: 11, color: C.blue }}>⤷ {arco.act2Midpoint}</p>}
+                          {arco.act2Midpoint && <p style={{ fontSize: 11, color: C.blue, marginTop: 4 }}>⤷ {arco.act2Midpoint}</p>}
                         </div>
                         <div style={{ background: C.bg, borderRadius: 10, padding: 12 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: C.green }}>ACTO III</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: C.green, marginBottom: 4 }}>ACTO III</div>
                           <p style={{ fontSize: 12, color: C.mid }}>{arco.act3Desc || "—"}</p>
-                          {arco.act3Resolution && <p style={{ fontSize: 11, color: C.green }}>✓ {arco.act3Resolution}</p>}
+                          {arco.act3Resolution && <p style={{ fontSize: 11, color: C.green, marginTop: 4 }}>✓ {arco.act3Resolution}</p>}
                         </div>
                       </div>
                       {arco.notes && <div style={{ marginTop: 12, padding: "8px 12px", background: C.aSoft, borderRadius: 8, fontSize: 12 }}>📝 {arco.notes}</div>}
-                      <div style={{ marginTop: 8, fontSize: 11, color: C.light }}>Estado: {arco.status === "planned" ? "📋 Planificado" : arco.status === "writing" ? "✍ Escribiendo" : "✓ Completado"}</div>
+                      <div style={{ marginTop: 8, fontSize: 11, color: C.light }}>
+                        Estado: {arco.status === "planned" ? "📋 Planificado" : arco.status === "writing" ? "✍ Escribiendo" : "✓ Completado"}
+                      </div>
                     </div>
                   );
                 })}
               </div>
             )}
 
-            {/* PUBLICAR */}
+            {/* Publicar */}
             {view === "publicar" && (
               <div style={{ maxWidth: 880 }}>
                 <SecHdr title="Publicar" />
@@ -1429,12 +1366,15 @@
                   <div style={{ display: "grid", gridTemplateColumns: "250px 1fr", gap: 20 }}>
                     <div style={card}>
                       <select value={pubSource} onChange={e => setPubSource(e.target.value)} style={fIn}>
-                        <option value="manuscript">Manuscrito</option><option value="synopsis">Sinopsis</option>
+                        <option value="manuscript">Manuscrito</option>
+                        <option value="synopsis">Sinopsis</option>
                       </select>
                       <select value={pubOpts.selOpt} onChange={e => setPubOpts(p => ({ ...p, selOpt: e.target.value }))} style={{ ...fIn, marginTop: 12 }}>
                         {PUB_FORMATS.find(f => f.id === pubFormat)?.optList.map(o => <option key={o}>{o}</option>)}
                       </select>
-                      <button onClick={generatePublication} disabled={pubBusy} style={{ ...primBtn(pubBusy), width: "100%", marginTop: 16 }}>{pubBusy ? "⏳" : "✦ Adaptar"}</button>
+                      <button onClick={generatePublication} disabled={pubBusy} style={{ ...primBtn(pubBusy), width: "100%", marginTop: 16 }}>
+                        {pubBusy ? "⏳" : "✦ Adaptar"}
+                      </button>
                     </div>
                     {pubResult && (
                       <div style={card}>
@@ -1442,7 +1382,9 @@
                           <button onClick={copyPub} style={ghostBtn}>📋 Copiar</button>
                           <button onClick={downloadPub} style={ghostBtn}>⬇ .txt</button>
                         </div>
-                        <div style={{ background: C.bg, borderRadius: 12, padding: "20px", fontSize: 14, lineHeight: 1.8, whiteSpace: "pre-wrap", maxHeight: 500, overflowY: "auto" }}>{pubResult}</div>
+                        <div style={{ background: C.bg, borderRadius: 12, padding: "20px", fontSize: 14, lineHeight: 1.8, whiteSpace: "pre-wrap", maxHeight: 500, overflowY: "auto" }}>
+                          {pubResult}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1451,11 +1393,10 @@
             )}
           </div>
 
-          {/* MODALES */}
+          {/* Modales */}
           {modal && (
             <Modal title={modal.type === "describe" ? "Descripciones Sensoriales" : "Reescritura"} onClose={() => setModal(null)}>
-              {busy && <div>Cargando...</div>}
-              {modal.type === "describe" && modal.results && !busy && (
+              {modal.type === "describe" && modal.results && (
                 <div>
                   {Object.entries(modal.results).map(([sense, text]) => text && (
                     <div key={sense} style={{ marginBottom: 10 }}>
@@ -1465,7 +1406,7 @@
                   ))}
                 </div>
               )}
-              {modal.type === "rewrite" && modal.results && !busy && (
+              {modal.type === "rewrite" && modal.results && (
                 <div>
                   <div style={{ padding: "12px", background: C.bg, borderRadius: 10, marginBottom: 16, fontSize: 14 }}>{modal.results}</div>
                   <button onClick={() => insertResult(modal.results)} style={primBtn(false)}>✓ Reemplazar</button>
@@ -1476,74 +1417,121 @@
 
           {charForm && (
             <Modal title={charForm.id ? "Editar Personaje" : "Nuevo Personaje"} onClose={() => setCharForm(null)}>
-              <Fld label="Nombre" value={charForm.name} onChange={v => setCharForm(f => ({ ...f, name: v }))} />
-              <div style={{ marginBottom: 16 }}><label style={fLb}>Rol</label><select value={charForm.role} onChange={e => setCharForm(f => ({ ...f, role: e.target.value }))} style={fIn}><option value="protagonist">Protagonista</option><option value="antagonist">Antagonista</option><option value="secondary">Secundario</option><option value="mentor">Mentor</option><option value="other">Otro</option></select></div>
-              <Fld label="Apariencia" value={charForm.appearance || ""} onChange={v => setCharForm(f => ({ ...f, appearance: v }))} ta h={70} />
+              <Fld label="Nombre" value={charForm.name} onChange={v => setCharForm({ ...charForm, name: v })} />
+              <div style={{ marginBottom: 16 }}>
+                <label style={fLb}>Rol</label>
+                <select value={charForm.role} onChange={e => setCharForm({ ...charForm, role: e.target.value })} style={fIn}>
+                  <option value="protagonist">Protagonista</option>
+                  <option value="antagonist">Antagonista</option>
+                  <option value="secondary">Secundario</option>
+                  <option value="mentor">Mentor</option>
+                  <option value="other">Otro</option>
+                </select>
+              </div>
+              <Fld label="Apariencia" value={charForm.appearance || ""} onChange={v => setCharForm({ ...charForm, appearance: v })} ta h={70} />
               <button onClick={() => saveChar(charForm)} disabled={!charForm.name.trim()} style={{ ...primBtn(!charForm.name.trim()), width: "100%", marginTop: 8 }}>Guardar</button>
             </Modal>
           )}
 
           {codexForm && (
             <Modal title={codexForm.id ? "Editar" : "Nueva entrada"} onClose={() => setCodexForm(null)}>
-              <Fld label="Nombre" value={codexForm.name} onChange={v => setCodexForm(f => ({ ...f, name: v }))} />
-              <div style={{ marginBottom: 16 }}><label style={fLb}>Tipo</label><select value={codexForm.type} onChange={e => setCodexForm(f => ({ ...f, type: e.target.value }))} style={fIn}><option value="personaje">Personaje</option><option value="lugar">Lugar</option><option value="objeto">Objeto</option><option value="mitología">Mitología</option><option value="otro">Otro</option></select></div>
-              <Fld label="Descripción" value={codexForm.desc || ""} onChange={v => setCodexForm(f => ({ ...f, desc: v }))} ta h={100} />
+              <Fld label="Nombre" value={codexForm.name} onChange={v => setCodexForm({ ...codexForm, name: v })} />
+              <div style={{ marginBottom: 16 }}>
+                <label style={fLb}>Tipo</label>
+                <select value={codexForm.type} onChange={e => setCodexForm({ ...codexForm, type: e.target.value })} style={fIn}>
+                  <option value="personaje">Personaje</option><option value="lugar">Lugar</option>
+                  <option value="objeto">Objeto</option><option value="mitología">Mitología</option><option value="otro">Otro</option>
+                </select>
+              </div>
+              <Fld label="Descripción" value={codexForm.desc || ""} onChange={v => setCodexForm({ ...codexForm, desc: v })} ta h={100} />
               <button onClick={() => saveCodex(codexForm)} disabled={!codexForm.name.trim()} style={{ ...primBtn(!codexForm.name.trim()), width: "100%" }}>Guardar</button>
             </Modal>
           )}
 
           {lbForm && (
             <Modal title={lbForm.id ? "Editar" : "Nueva entrada"} onClose={() => setLbForm(null)}>
-              <Fld label="Palabras clave (separadas por coma)" value={lbForm.kws || ""} onChange={v => setLbForm(f => ({ ...f, kws: v }))} />
-              <Fld label="Información" value={lbForm.content || ""} onChange={v => setLbForm(f => ({ ...f, content: v }))} ta h={120} />
+              <Fld label="Palabras clave (separadas por coma)" value={lbForm.kws || ""} onChange={v => setLbForm({ ...lbForm, kws: v })} />
+              <Fld label="Información" value={lbForm.content || ""} onChange={v => setLbForm({ ...lbForm, content: v })} ta h={120} />
               <button onClick={() => saveLb(lbForm)} disabled={!lbForm.kws?.trim()} style={{ ...primBtn(!lbForm.kws?.trim()), width: "100%" }}>Guardar</button>
             </Modal>
           )}
 
           {escaletaForm && (
             <Modal title={escaletaForm.id ? "Editar Escena" : "Nueva Escena"} onClose={() => setEscaletaForm(null)}>
-              <Fld label="Título" value={escaletaForm.title} onChange={v => setEscaletaForm(f => ({ ...f, title: v }))} />
-              <Fld label="Resumen" value={escaletaForm.summary || ""} onChange={v => setEscaletaForm(f => ({ ...f, summary: v }))} ta h={80} />
+              <Fld label="Título" value={escaletaForm.title} onChange={v => setEscaletaForm({ ...escaletaForm, title: v })} />
+              <Fld label="Resumen" value={escaletaForm.summary || ""} onChange={v => setEscaletaForm({ ...escaletaForm, summary: v })} ta h={80} />
               <button onClick={() => saveEsc(escaletaForm)} disabled={!escaletaForm.title.trim()} style={{ ...primBtn(!escaletaForm.title.trim()), width: "100%" }}>Guardar</button>
             </Modal>
           )}
 
           {arcosForm && (
-            <Modal title={arcosForm.id ? "Editar Arco" : "Nuevo Arco"} onClose={() => setArcosForm(null)} wide>
-              <Fld label="Título del Arco" value={arcosForm.title} onChange={v => setArcosForm(f => ({ ...f, title: v }))} />
-              <div style={{ marginBottom: 16 }}><label style={fLb}>Personaje</label><select value={arcosForm.characterId} onChange={e => { const ch = characters.find(c => c.id === e.target.value); setArcosForm(f => ({ ...f, characterId: e.target.value, characterName: ch?.name || "" })); }} style={fIn}><option value="">Seleccionar personaje</option>{characters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div><label style={fLb}>Acto I - Descripción</label><textarea value={arcosForm.act1Desc || ""} onChange={e => setArcosForm(f => ({ ...f, act1Desc: e.target.value }))} style={fIn} rows={2} /></div>
-                <div><label style={fLb}>Conflicto Acto I</label><textarea value={arcosForm.act1Conflict || ""} onChange={e => setArcosForm(f => ({ ...f, act1Conflict: e.target.value }))} style={fIn} rows={2} /></div>
-                <div><label style={fLb}>Acto II - Desarrollo</label><textarea value={arcosForm.act2Desc || ""} onChange={e => setArcosForm(f => ({ ...f, act2Desc: e.target.value }))} style={fIn} rows={2} /></div>
-                <div><label style={fLb}>Punto Medio</label><textarea value={arcosForm.act2Midpoint || ""} onChange={e => setArcosForm(f => ({ ...f, act2Midpoint: e.target.value }))} style={fIn} rows={2} /></div>
-                <div><label style={fLb}>Acto III - Resolución</label><textarea value={arcosForm.act3Desc || ""} onChange={e => setArcosForm(f => ({ ...f, act3Desc: e.target.value }))} style={fIn} rows={2} /></div>
-                <div><label style={fLb}>Cierre / Lección</label><textarea value={arcosForm.act3Resolution || ""} onChange={e => setArcosForm(f => ({ ...f, act3Resolution: e.target.value }))} style={fIn} rows={2} /></div>
+            <Modal title={arcosForm.id ? "Editar Arco" : "Nuevo Arco"} onClose={() => setArcosForm(null)}>
+              <Fld label="Título del Arco" value={arcosForm.title} onChange={v => setArcosForm({ ...arcosForm, title: v })} />
+              <div style={{ marginBottom: 16 }}>
+                <label style={fLb}>Personaje</label>
+                <select value={arcosForm.characterId} onChange={e => { const ch = characters.find(c => c.id === e.target.value); setArcosForm({ ...arcosForm, characterId: e.target.value, characterName: ch?.name || "" }); }} style={fIn}>
+                  <option value="">Seleccionar personaje</option>
+                  {characters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
               </div>
-              <Fld label="Notas adicionales" value={arcosForm.notes || ""} onChange={v => setArcosForm(f => ({ ...f, notes: v }))} ta h={60} />
-              <div style={{ marginBottom: 16 }}><label style={fLb}>Estado</label><select value={arcosForm.status} onChange={e => setArcosForm(f => ({ ...f, status: e.target.value }))} style={fIn}><option value="planned">Planificado</option><option value="writing">Escribiendo</option><option value="completed">Completado</option></select></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div><label style={fLb}>Acto I - Descripción</label><textarea value={arcosForm.act1Desc || ""} onChange={e => setArcosForm({ ...arcosForm, act1Desc: e.target.value })} style={fIn} rows={2} /></div>
+                <div><label style={fLb}>Conflicto Acto I</label><textarea value={arcosForm.act1Conflict || ""} onChange={e => setArcosForm({ ...arcosForm, act1Conflict: e.target.value })} style={fIn} rows={2} /></div>
+                <div><label style={fLb}>Acto II - Desarrollo</label><textarea value={arcosForm.act2Desc || ""} onChange={e => setArcosForm({ ...arcosForm, act2Desc: e.target.value })} style={fIn} rows={2} /></div>
+                <div><label style={fLb}>Punto Medio</label><textarea value={arcosForm.act2Midpoint || ""} onChange={e => setArcosForm({ ...arcosForm, act2Midpoint: e.target.value })} style={fIn} rows={2} /></div>
+                <div><label style={fLb}>Acto III - Resolución</label><textarea value={arcosForm.act3Desc || ""} onChange={e => setArcosForm({ ...arcosForm, act3Desc: e.target.value })} style={fIn} rows={2} /></div>
+                <div><label style={fLb}>Cierre / Lección</label><textarea value={arcosForm.act3Resolution || ""} onChange={e => setArcosForm({ ...arcosForm, act3Resolution: e.target.value })} style={fIn} rows={2} /></div>
+              </div>
+              <Fld label="Notas adicionales" value={arcosForm.notes || ""} onChange={v => setArcosForm({ ...arcosForm, notes: v })} ta h={60} />
+              <div style={{ marginBottom: 16 }}>
+                <label style={fLb}>Estado</label>
+                <select value={arcosForm.status} onChange={e => setArcosForm({ ...arcosForm, status: e.target.value })} style={fIn}>
+                  <option value="planned">Planificado</option>
+                  <option value="writing">Escribiendo</option>
+                  <option value="completed">Completado</option>
+                </select>
+              </div>
               <button onClick={() => saveArco(arcosForm)} disabled={!arcosForm.title.trim() || !arcosForm.characterId} style={{ ...primBtn(!arcosForm.title.trim() || !arcosForm.characterId), width: "100%" }}>Guardar Arco</button>
             </Modal>
           )}
 
           {addNodeForm && (
             <Modal title="Añadir Nodo" onClose={() => setAddNodeForm(null)}>
-              <Fld label="Nombre del nodo" value={addNodeForm.label} onChange={v => setAddNodeForm(f => ({ ...f, label: v }))} />
+              <Fld label="Nombre del nodo" value={addNodeForm.label} onChange={v => setAddNodeForm({ ...addNodeForm, label: v })} />
               <button onClick={() => saveMapNode(addNodeForm)} disabled={!addNodeForm.label.trim()} style={{ ...primBtn(!addNodeForm.label.trim()), width: "100%" }}>Añadir</button>
             </Modal>
           )}
 
           {addLinkForm && buildAllMapNodes().length >= 2 && (
             <Modal title="Crear Conexión" onClose={() => setAddLinkForm(null)}>
-              <div style={{ marginBottom: 14 }}><label style={fLb}>Desde</label><select value={addLinkForm.source} onChange={e => setAddLinkForm(f => ({ ...f, source: e.target.value }))} style={fIn}>{buildAllMapNodes().map(n => <option key={n.id} value={n.id}>{n.label}</option>)}</select></div>
-              <div style={{ marginBottom: 14 }}><label style={fLb}>Hacia</label><select value={addLinkForm.target} onChange={e => setAddLinkForm(f => ({ ...f, target: e.target.value }))} style={fIn}>{buildAllMapNodes().map(n => <option key={n.id} value={n.id}>{n.label}</option>)}</select></div>
-              <Fld label="Etiqueta (opcional)" value={addLinkForm.label || ""} onChange={v => setAddLinkForm(f => ({ ...f, label: v }))} />
-              <button onClick={() => saveMapLink(addLinkForm)} disabled={addLinkForm.source === addLinkForm.target} style={{ ...primBtn(addLinkForm.source === addLinkForm.target), width: "100%" }}>Crear Conexión</button>
+              <div style={{ marginBottom: 14 }}>
+                <label style={fLb}>Desde</label>
+                <select value={addLinkForm.source} onChange={e => setAddLinkForm({ ...addLinkForm, source: e.target.value })} style={fIn}>
+                  <option value="">Seleccionar</option>
+                  {buildAllMapNodes().map(n => <option key={n.id} value={n.id}>{n.label}</option>)}
+                </select>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={fLb}>Hacia</label>
+                <select value={addLinkForm.target} onChange={e => setAddLinkForm({ ...addLinkForm, target: e.target.value })} style={fIn}>
+                  <option value="">Seleccionar</option>
+                  {buildAllMapNodes().map(n => <option key={n.id} value={n.id}>{n.label}</option>)}
+                </select>
+              </div>
+              <Fld label="Etiqueta (opcional)" value={addLinkForm.label || ""} onChange={v => setAddLinkForm({ ...addLinkForm, label: v })} />
+              <button onClick={() => saveMapLink(addLinkForm)} disabled={!addLinkForm.source || !addLinkForm.target || addLinkForm.source === addLinkForm.target} style={{ ...primBtn(!addLinkForm.source || !addLinkForm.target || addLinkForm.source === addLinkForm.target), width: "100%" }}>Crear Conexión</button>
             </Modal>
           )}
 
-          {toast && <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: C.accent, color: "#fff", padding: "12px 20px", borderRadius: 999, zIndex: 2000 }}>{toast}</div>}
-          {showSettings && <SettingsModal user={user} currentKey={apiKey} onSave={handleSaveApiKey} onClose={() => setShowSettings(false)} />}
+          {toast && (
+            <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: C.accent, color: "#fff", padding: "12px 20px", borderRadius: 999, zIndex: 2000, whiteSpace: "nowrap" }}>
+              {toast}
+            </div>
+          )}
+
+          {showSettings && (
+            <SettingsModal user={user} currentKey={apiKey} onSave={handleSaveApiKey} onClose={() => setShowSettings(false)} />
+          )}
         </div>
       );
     }
