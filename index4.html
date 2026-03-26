@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>NovelAI Studio</title>
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✍</text></svg>" />
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    html,
+    body,
+    #root {
+      height: 100%;
+      width: 100%;
+      overflow: hidden
+    }
+
+    body {
+      font-family: Georgia, serif;
+      background: #0c0a14;
+      -webkit-tap-highlight-color: transparent
+    }
+
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(124, 58, 237, 0.3);
+      border-radius: 999px
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg)
+      }
+
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    @keyframes savePop {
+      0% {
+        opacity: 0;
+        transform: scale(.8)
+      }
+
+      60% {
+        transform: scale(1.05)
+      }
+
+      100% {
+        opacity: 1;
+        transform: scale(1)
+      }
+    }
+
+    .desk-hover {
+      transition: transform .25s ease, filter .25s ease;
+      cursor: pointer
+    }
+
+    .desk-hover:hover {
+      transform: translateY(-6px) scale(1.03);
+      filter: brightness(1.15)
+    }
+
+    @media(max-width:768px) {
+      .app-sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        z-index: 300 !important;
+        transform: translateX(-100%);
+        transition: transform .28s cubic-bezier(.4, 0, .2, 1);
+        box-shadow: none !important
+      }
+
+      .app-sidebar.open {
+        transform: translateX(0) !important;
+        box-shadow: 6px 0 24px rgba(0, 0, 0, 0.35) !important
+      }
+
+      .app-main {
+        padding: 60px 16px 80px !important
+      }
+
+      .two-col {
+        grid-template-columns: 1fr !important
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    // ═══════════════════════════════════════════════════════════
+    // FIREBASE CONFIG
+    // ═══════════════════════════════════════════════════════════
+    firebase.initializeApp({
+      apiKey: "AIzaSyD05j95pwiyual-sMUYgwvi1DsZoN2Yb-M",
+      authDomain: "novelai-studio-87636.firebaseapp.com",
+      projectId: "novelai-studio-87636",
+      storageBucket: "novelai-studio-87636.firebasestorage.app",
+      messagingSenderId: "1095225113205",
+      appId: "1:1095225113205:web:589e9b8e9a6e283b2c163c"
+    });
+
+    const fbAuth = firebase.auth();
+    const fbDb = firebase.firestore();
+
+    // ═══════════════════════════════════════════════════════════
+    // SISTEMA DE GUARDADO CORREGIDO
+    // ═══════════════════════════════════════════════════════════
+    const saveBookData = async (uid, bookId, key, value) => {
+      if (!uid || !bookId) return false;
+      try {
+        localStorage.setItem(`b:${bookId}:${key}`, JSON.stringify(value));
+        await fbDb.collection('users').doc(uid).collection('books').doc(bookId)
+          .set({ [key]: value, _ts: Date.now() }, { merge: true });
+        return true;
+      } catch (e) {
+        console.warn('Error guardando:', e);
+        return false;
+      }
+    };
+
+    const loadBookData = async (uid, bookId, key, defaultValue) => {
+      if (!uid || !bookId) return defaultValue;
+      try {
+        const doc = await fbDb.collection('users').doc(uid).collection('books').doc(bookId).get();
+        if (doc.exists && doc.data()[key] !== undefined) {
+          const val = doc.data()[key];
+          localStorage.setItem(`b:${bookId}:${key}`, JSON.stringify(val));
+          return val;
+        }
+      } catch (e) { }
+      try {
+        const local = localStorage.getItem(`b:${bookId}:${key}`);
+        if (local !== null) return JSON.parse(local);
+      } catch (e) { }
+      return defaultValue;
+    };
+
+    const saveLibrary = async (uid, library) => {
+      if (!uid) return;
+      localStorage.setItem('library:books', JSON.stringify(library));
+      try {
+        await fbDb.collection('users').doc(uid).set({ library, _ts: Date.now() }, { merge: true });
+      } catch (e) { }
+    };
+
+    const loadLibrary = async (uid) => {
+      if (!uid) return [];
+      try {
+        const doc = await fbDb.collection('users').doc(uid).get();
+        if (doc.exists && doc.data().library) {
+          const lib = doc.data().library;
+          localStorage.setItem('library:books', JSON.stringify(lib));
+          return lib;
+        }
+      } catch (e) { }
+      try {
+        const local = localStorage.getItem('library:books');
+        if (local) return JSON.parse(local);
+      } catch (e) { }
+      return [];
+    };
+
+    const saveApiKey = async (uid, key) => {
+      localStorage.setItem('novelai:apikey', key);
+      if (!uid) return;
+      try {
+        await fbDb.collection('users').doc(uid).set({ anthropicKey: key }, { merge: true });
+      } catch (e) { }
+    };
+
+    const loadApiKey = async (uid) => {
+      if (uid) {
+        try {
+          const doc = await fbDb.collection('users').doc(uid).get();
+          if (doc.exists && doc.data().anthropicKey) {
+            const key = doc.data().anthropicKey;
+            localStorage.setItem('novelai:apikey', key);
+            return key;
+          }
+        } catch (e) { }
+      }
+      return localStorage.getItem('novelai:apikey') || null;
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // GOOGLE DOCS SYNC
+    // ═══════════════════════════════════════════════════════════
+    const GDOCS_CLIENT_ID = "1095225113205-mp91no1an5vip1fu7526hfrri8pvken3.apps.googleusercontent.com";
+    const GDOCS_SCOPES = "https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file";
+
+    let _gTokenClient = null;
+    let _gAccessToken = null;
+    let _gTokenExpiry = 0;
+
+    function _ensureGDocsToken() {
+      return new Promise((resolve, reject) => {
+        if (_gAccessToken && Date.now() < _gTokenExpiry - 60000) { resolve(_gAccessToken); return; }
+        if (!window.google?.accounts?.oauth2) { reject(new Error("Google Identity Services no cargado aún.")); return; }
+        if (!_gTokenClient) {
+          _gTokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: GDOCS_CLIENT_ID,
+            scope: GDOCS_SCOPES,
+            callback: () => { },
+          });
+        }
+        _gTokenClient.callback = (resp) => {
+          if (resp.error) { reject(new Error("Error: " + resp.error)); return; }
+          _gAccessToken = resp.access_token;
+          _gTokenExpiry = Date.now() + (resp.expires_in || 3600) * 1000;
+          resolve(_gAccessToken);
+        };
+        _gTokenClient.requestAccessToken({ prompt: _gAccessToken ? "" : "consent" });
+      });
+    }
+
+    async function _gDocsCreate(title) {
+      const token = await _ensureGDocsToken();
+      const res = await fetch("https://docs.googleapis.com/v1/documents", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      if (!res.ok) throw new Error("No se pudo crear el documento");
+      const doc = await res.json();
+      return doc.documentId;
+    }
+
+    async function _gDocsWrite(docId, text) {
+      const token = await _ensureGDocsToken();
+      const getRes = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
+        headers: { "Authorization": "Bearer " + token },
+      });
+      if (!getRes.ok) throw new Error("No se pudo leer el documento");
+      const doc = await getRes.json();
+      const content = doc.body?.content || [];
+      const lastEl = content[content.length - 1];
+      const endIndex = lastEl ? (lastEl.endIndex - 1) : 1;
+      const requests = [];
+      if (endIndex > 1) requests.push({ deleteContentRange: { range: { startIndex: 1, endIndex } } });
+      if (text) requests.push({ insertText: { location: { index: 1 }, text } });
+      if (!requests.length) return;
+      await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ requests }),
+      });
+    }
+
+    async function _gDocsRead(docId) {
+      const token = await _ensureGDocsToken();
+      const res = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
+        headers: { "Authorization": "Bearer " + token },
+      });
+      if (!res.ok) throw new Error("No se pudo leer el documento");
+      const doc = await res.json();
+      let text = "";
+      for (const el of (doc.body?.content || [])) {
+        if (el.paragraph) {
+          for (const pe of (el.paragraph.elements || [])) {
+            if (pe.textRun?.content) text += pe.textRun.content;
+          }
+        }
+      }
+      return text.trimEnd();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // API
+    // ═══════════════════════════════════════════════════════════
+    async function callAI(messages, system = "", max = 1000, apiKey) {
+      if (!apiKey) throw new Error("Sin API key.");
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true"
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: max,
+          ...(system ? { system } : {}),
+          messages
+        }),
+      });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error.message);
+      return d.content?.map(b => b.text || "").join("\n") || "";
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // CONSTANTS
+    // ═══════════════════════════════════════════════════════════
+    const BOOK_PALETTE = ["#7c3aed", "#2563eb", "#dc2626", "#059669", "#d97706", "#ec4899", "#0891b2", "#92400e", "#065f46", "#1d4ed8"];
+    const randColor = () => BOOK_PALETTE[Math.floor(Math.random() * BOOK_PALETTE.length)];
+    const newBookId = () => "book_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+
+    const C = { bg: "#f8f7f5", surface: "#ffffff", border: "#e8e5f0", text: "#1a1825", mid: "#6b6580", light: "#a09ab8", accent: "#7c3aed", aLight: "#ede9fe", aMid: "#8b5cf6", aSoft: "#f5f3ff", green: "#10b981", red: "#ef4444", yellow: "#f59e0b", blue: "#3b82f6" };
+    const card = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, boxShadow: "0 1px 3px rgba(124,58,237,0.08)" };
+    const fIn = { width: "100%", background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: "11px 16px", color: C.text, fontSize: 14, fontFamily: "Georgia,serif", boxSizing: "border-box", outline: "none" };
+    const fLb = { display: "block", color: C.mid, fontSize: 12, fontFamily: "Georgia,serif", marginBottom: 6, fontWeight: 500, letterSpacing: "0.02em", textTransform: "uppercase" };
+    const primBtn = d => ({ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 24px", borderRadius: 999, border: "none", background: d ? "#e5e0f5" : C.accent, color: d ? "#a09ab8" : "#fff", cursor: d ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 600 });
+    const ghostBtn = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.mid, cursor: "pointer", fontSize: 13 };
+    const pill = (a, sm) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: sm ? "5px 12px" : "8px 18px", borderRadius: 999, border: `1px solid ${a ? C.accent : C.border}`, background: a ? C.aLight : C.surface, color: a ? C.accent : C.mid, cursor: "pointer", fontSize: sm ? 12 : 13, fontWeight: a ? 600 : 400 });
+
+    const NODE_C = { protagonist: C.green, antagonist: C.red, secondary: C.blue, mentor: C.yellow, other: C.light, lugar: "#0ea5e9", objeto: "#f97316", mitología: "#8b5cf6", otro: "#6b7280", lorebook: "#06b6d4", escena: "#d97706", structure: "#64748b", tema: C.accent, custom: "#374151" };
+    const ROLE_LBL = { protagonist: "Protagonista", antagonist: "Antagonista", secondary: "Secundario", mentor: "Mentor", other: "Otro" };
+
+    const PUB_FORMATS = [
+      { id: "libro", icon: "📚", label: "Libro / Novela", color: "#7c3aed", optList: ["Formato editorial", "Revisar estilo", "Normalizar diálogos"] },
+      { id: "cuento", icon: "🧒", label: "Cuento Infantil", color: "#f59e0b", optList: ["Edad 3-6 años", "Edad 7-10 años"] },
+      { id: "blog", icon: "🌐", label: "Blog", color: "#3b82f6", optList: ["Subtítulos", "Tono divulgativo"] },
+    ];
+
+    const NAV = [
+      { group: "ESCRITURA", items: [{ id: "engine", icon: "⚡", label: "Story Engine" }, { id: "manuscript", icon: "✍", label: "Manuscrito" }] },
+      { group: "PLANIFICACIÓN", items: [{ id: "planning", icon: "⊞", label: "Tablero" }, { id: "escaleta", icon: "≡", label: "Escaleta" }, { id: "structure", icon: "◇", label: "Estructura" }, { id: "arcos", icon: "↺", label: "Arcos" }] },
+      { group: "UNIVERSO", items: [{ id: "characters", icon: "◉", label: "Personajes" }, { id: "world", icon: "○", label: "Mundo" }, { id: "voice", icon: "◈", label: "Voz & Técnica" }] },
+      { group: "HERRAMIENTAS", items: [{ id: "brainstorm", icon: "✦", label: "Brainstorm" }, { id: "mapa", icon: "⬡", label: "Mapa" }, { id: "codex", icon: "□", label: "Codex" }, { id: "lorebook", icon: "⌘", label: "Lorebook" }, { id: "publicar", icon: "🖨", label: "Publicar" }] },
+    ];
+
+    const TOOLS_MS = [
+      { id: "descriptivo", label: "🎨 Descriptivo", group: "estilo" }, { id: "intenso", label: "🔥 Intenso", group: "estilo" },
+      { id: "corto", label: "✂ Corto", group: "estilo" }, { id: "pov", label: "↕ Cambiar POV", group: "estilo" },
+      { id: "cliffhanger", label: "🪝 Cliffhanger", group: "drama" }, { id: "giro", label: "🌀 Giro", group: "drama" },
+      { id: "tension", label: "⚡ Tensión", group: "drama" }, { id: "dialogo", label: "💬 Diálogo", group: "drama" },
+      { id: "flashback", label: "⏮ Flashback", group: "narrative" }, { id: "foreshadow", label: "🔮 Presagio", group: "narrative" },
+      { id: "metafora", label: "🌿 Metáfora", group: "narrative" }, { id: "ritmo", label: "🥁 Ritmo", group: "narrative" },
+    ];
+
+    const EC = { name: "", role: "protagonist", appearance: "", fears: "", secret: "", ghost: "", arcStart: "", arcEnd: "", arcHow: "" };
+    const EW = { genre: "", magicRules: "", geography: "", society: "", tone: "" };
+    const ES = { premise: "", theme: "", pov: "thirdClose", incitingIncident: "", midpointTwist: "", darkNight: "", climax: "", plotTwists: "" };
+    const EE = { title: "", summary: "", goal: "", conflict: "", hook: "" };
+    const ARCO_DEFAULT = { id: "", characterId: "", characterName: "", title: "", act1Desc: "", act1Conflict: "", act2Desc: "", act2Midpoint: "", act3Desc: "", act3Resolution: "", status: "planned", notes: "" };
+
+    function useMobile() {
+      const [mob, setMob] = useState(window.innerWidth < 768);
+      useEffect(() => {
+        const h = () => setMob(window.innerWidth < 768);
+        window.addEventListener('resize', h); return () => window.removeEventListener('resize', h);
+      }, []);
+      return mob;
+    }
+
+    function debounce(fn, delay) {
+      let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // COMPONENTES UI
+    // ═══════════════════════════════════════════════════════════
+    function LoginScreen() {
+      const [loading, setLoading] = useState(false);
+      const signIn = async () => {
+        setLoading(true);
+        try { await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+        catch (e) { setLoading(false); }
+      };
+      return (
+        <div style={{ width: '100vw', height: '100vh', background: '#0c0a14', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: 'rgba(22,18,36,.96)', border: '1px solid rgba(124,58,237,.3)', borderRadius: 24, padding: '44px 32px', maxWidth: 420, textAlign: 'center' }}>
+            <div style={{ fontSize: 38, fontFamily: "'Palatino Linotype',Georgia,serif", color: '#fdf6e3' }}>Novel<span style={{ color: '#a78bfa' }}>AI</span></div>
+            <div style={{ fontSize: 10, color: 'rgba(167,139,250,.5)', letterSpacing: '0.4em', marginBottom: 28 }}>STUDIO</div>
+            <button onClick={signIn} disabled={loading} style={{ width: '100%', padding: '14px', borderRadius: 12, background: 'rgba(255,255,255,.06)', color: '#fdf6e3', cursor: 'pointer', fontSize: 15 }}>
+              {loading ? "⏳" : "Continuar con Google"}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    function ApiKeySetup({ onSave }) {
+      const [key, setKey] = useState("");
+      const [testing, setTesting] = useState(false);
+      const test = async () => {
+        if (!key.trim()) return;
+        setTesting(true);
+        try {
+          await callAI([{ role: "user", content: "Di: OK" }], "", 10, key.trim());
+          onSave(key.trim());
+        } catch (e) { alert("API key inválida"); }
+        setTesting(false);
+      };
+      return (
+        <div style={{ width: "100vw", height: "100vh", background: "#0c0a14", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "rgba(22,18,36,0.96)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: 20, padding: "36px 28px", maxWidth: 440, textAlign: "center" }}>
+            <div style={{ fontSize: 32, color: "#fdf6e3" }}>Novel<span style={{ color: "#a78bfa" }}>AI</span></div>
+            <p style={{ color: "rgba(255,240,210,0.75)", marginBottom: 24 }}>Necesitas una API Key de Anthropic</p>
+            <input type="password" value={key} onChange={e => setKey(e.target.value)} placeholder="sk-ant-api03-..." style={{ ...fIn, background: "rgba(255,255,255,0.06)", color: "#fdf6e3", marginBottom: 16 }} />
+            <button onClick={test} disabled={testing || !key.trim()} style={{ ...primBtn(testing || !key.trim()), width: "100%" }}>{testing ? "⏳" : "✦ Guardar"}</button>
+          </div>
+        </div>
+      );
+    }
+
+    function SettingsModal({ user, currentKey, onSave, onClose }) {
+      const [newKey, setNewKey] = useState("");
+      return (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(12,10,20,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000 }}>
+          <div style={{ background: "#1a1528", borderRadius: 20, width: "100%", maxWidth: 420 }}>
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(124,58,237,0.15)", display: "flex", justifyContent: "space-between" }}>
+              <h3 style={{ color: "#fdf6e3" }}>⚙ Ajustes</h3>
+              <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(200,180,255,0.4)", fontSize: 20 }}>✕</button>
+            </div>
+            <div style={{ padding: 24 }}>
+              <input type="password" value={newKey} onChange={e => setNewKey(e.target.value)} placeholder="Nueva API Key" style={{ ...fIn, background: "rgba(255,255,255,0.05)", color: "#fdf6e3", marginBottom: 16 }} />
+              <button onClick={() => newKey.trim() && onSave(newKey.trim())} style={{ ...primBtn(!newKey.trim()), width: "100%" }}>Guardar</button>
+              <button onClick={() => fbAuth.signOut()} style={{ marginTop: 16, width: "100%", padding: "9px", borderRadius: 10, border: "1px solid rgba(200,180,255,0.15)", background: "transparent", color: "rgba(200,180,255,0.4)", cursor: "pointer" }}>Cerrar sesión</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function Modal({ title, onClose, children }) {
+      return (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(26,24,37,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: C.surface, borderRadius: 20, width: "100%", maxWidth: 500, maxHeight: "90vh", overflow: "auto" }}>
+            <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between" }}>
+              <h3 style={{ margin: 0 }}>{title}</h3>
+              <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20 }}>✕</button>
+            </div>
+            <div style={{ padding: 24 }}>{children}</div>
+          </div>
+        </div>
+      );
+    }
+
+    function Fld({ label, value, onChange, ph, h = 80, ta = false }) {
+      return (
+        <div style={{ marginBottom: 16 }}>
+          {label && <label style={fLb}>{label}</label>}
+          {ta ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={ph} style={{ ...fIn, minHeight: h, resize: "vertical" }} />
+            : <input value={value} onChange={e => onChange(e.target.value)} placeholder={ph} style={fIn} />}
+        </div>
+      );
+    }
+
+    function AiBtn({ label, onClick, busy }) {
+      return <button onClick={onClick} disabled={busy} style={{ ...pill(false, true), color: C.accent }}>{busy ? "⏳" : "✦"} {label}</button>;
+    }
+
+    function SecHdr({ title, sub, action }) {
+      return (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+          <div><h2 style={{ margin: 0, fontSize: 24, fontWeight: 400 }}>{title}</h2>{sub && <p style={{ margin: "5px 0 0", color: C.mid, fontSize: 13 }}>{sub}</p>}</div>
+          {action}
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // DESK SCENE
+    // ═══════════════════════════════════════════════════════════
+    function DeskScene({ library, user, onNewBook, onOpenLibrary, onSettings, onOpenRecent }) {
+      const isMobile = useMobile();
+      if (isMobile) {
+        return (
+          <div style={{ width: "100vw", height: "100vh", background: "#0c0a14", padding: "20px" }}>
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 32, color: "#fdf6e3" }}>Novel<span style={{ color: "#a78bfa" }}>AI</span></div>
+              <button onClick={onSettings} style={{ position: "absolute", top: 20, right: 20, background: "rgba(124,58,237,0.15)", border: "none", borderRadius: 999, padding: "8px 12px", color: "rgba(200,180,255,0.6)" }}>⚙</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <button onClick={onNewBook} style={{ background: "#7c3aed20", border: "1px solid #7c3aed40", borderRadius: 20, padding: "22px", textAlign: "left" }}><div style={{ fontSize: 26 }}>✍</div><div style={{ color: "#fdf6e3" }}>Nueva Obra</div></button>
+              <button onClick={onOpenLibrary} style={{ background: "#05966920", border: "1px solid #05966940", borderRadius: 20, padding: "22px", textAlign: "left" }}><div style={{ fontSize: 26 }}>📚</div><div style={{ color: "#fdf6e3" }}>Mis Libros</div></button>
+              {library[0] && <button onClick={() => onOpenRecent(library[0])} style={{ gridColumn: "span 2", background: "#d9770620", border: "1px solid #d9770640", borderRadius: 20, padding: "22px", textAlign: "left" }}><div style={{ fontSize: 26 }}>▶</div><div style={{ color: "#fdf6e3" }}>{library[0].title}</div></button>}
+            </div>
+          </div>
+        );
+      }
+      return (
+        <div style={{ width: "100vw", height: "100vh", background: "#0c0a14", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 48, color: "#fdf6e3" }}>Novel<span style={{ color: "#a78bfa" }}>AI</span></div>
+            <div style={{ fontSize: 12, color: "rgba(167,139,250,0.5)", letterSpacing: "0.3em", marginBottom: 40 }}>STUDIO</div>
+            <div style={{ display: "flex", gap: 24 }}>
+              <button onClick={onNewBook} className="desk-hover" style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.4)", borderRadius: 16, padding: "24px 32px", cursor: "pointer" }}><div style={{ fontSize: 32 }}>✍</div><div style={{ color: "#fdf6e3" }}>Nueva Obra</div></button>
+              <button onClick={onOpenLibrary} className="desk-hover" style={{ background: "rgba(5,150,105,0.15)", border: "1px solid rgba(5,150,105,0.4)", borderRadius: 16, padding: "24px 32px", cursor: "pointer" }}><div style={{ fontSize: 32 }}>📚</div><div style={{ color: "#fdf6e3" }}>Biblioteca</div></button>
+              {library[0] && <button onClick={() => onOpenRecent(library[0])} className="desk-hover" style={{ background: "rgba(217,119,6,0.15)", border: "1px solid rgba(217,119,6,0.4)", borderRadius: 16, padding: "24px 32px", cursor: "pointer" }}><div style={{ fontSize: 32 }}>▶</div><div style={{ color: "#fdf6e3" }}>{library[0].title}</div></button>}
+            </div>
+            <button onClick={onSettings} style={{ position: "absolute", top: 24, right: 24, background: "rgba(124,58,237,0.15)", border: "none", borderRadius: 999, padding: "8px 16px", color: "rgba(200,180,255,0.6)", cursor: "pointer" }}>⚙</button>
+          </div>
+        </div>
+      );
+    }
+
+    function LibraryPanel({ library, onOpen, onDelete, onClose }) {
+      const [confirmDel, setConfirmDel] = useState(null);
+      return (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(12,10,20,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "#1a1528", borderRadius: 24, width: "100%", maxWidth: 820, maxHeight: "88vh", overflow: "auto" }}>
+            <div style={{ padding: "24px", borderBottom: "1px solid rgba(124,58,237,0.15)", display: "flex", justifyContent: "space-between" }}>
+              <h2 style={{ color: "#fdf6e3" }}>Biblioteca</h2>
+              <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(200,180,255,0.5)", fontSize: 22 }}>✕</button>
+            </div>
+            <div style={{ padding: 20, display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 14 }}>
+              {library.map(book => (
+                <div key={book.id} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: 14, cursor: "pointer", position: "relative" }}>
+                  <div onClick={() => onOpen(book)} style={{ paddingTop: "130%", position: "relative", borderRadius: 8, overflow: "hidden", marginBottom: 10 }}>
+                    <div style={{ position: "absolute", inset: 0, background: `linear-gradient(160deg,${book.color}cc,${book.color}88)`, display: "flex", alignItems: "flex-end", padding: "10px" }}>
+                      <div style={{ fontSize: 11, color: "white", fontWeight: 600 }}>{book.title}</div>
+                    </div>
+                  </div>
+                  <div onClick={() => onOpen(book)} style={{ fontSize: 12, fontWeight: 600, color: "#fdf6e3" }}>{book.title}</div>
+                  {confirmDel === book.id ? (
+                    <div style={{ marginTop: 8, display: "flex", gap: 5 }}>
+                      <button onClick={() => { onDelete(book.id); setConfirmDel(null); }} style={{ flex: 1, padding: "5px", borderRadius: 8, background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>Borrar</button>
+                      <button onClick={() => setConfirmDel(null)} style={{ flex: 1, padding: "5px", borderRadius: 8, background: "transparent", color: "rgba(200,180,255,0.5)" }}>No</button>
+                    </div>
+                  ) : (
+                    <button onClick={e => { e.stopPropagation(); setConfirmDel(book.id); }} style={{ position: "absolute", top: 10, right: 10, background: "rgba(0,0,0,0.3)", border: "none", borderRadius: 999, width: 22, height: 22, color: "rgba(200,180,255,0.3)", cursor: "pointer" }}>✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function NewBookModal({ onConfirm, onClose }) {
+      const [title, setTitle] = useState("");
+      const [color, setColor] = useState(randColor());
+      return (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(12,10,20,0.88)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1001 }}>
+          <div style={{ background: "#1a1528", borderRadius: 20, width: "100%", maxWidth: 480 }}>
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(124,58,237,0.15)", display: "flex", justifyContent: "space-between" }}>
+              <h3 style={{ color: "#fdf6e3" }}>✦ Nueva Obra</h3>
+              <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20 }}>✕</button>
+            </div>
+            <div style={{ padding: 24 }}>
+              <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" style={{ ...fIn, background: "rgba(255,255,255,0.05)", color: "#fdf6e3", marginBottom: 20 }} />
+              <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+                {BOOK_PALETTE.map(c => <div key={c} onClick={() => setColor(c)} style={{ width: 32, height: 32, borderRadius: 999, background: c, cursor: "pointer", border: color === c ? "3px solid white" : "3px solid transparent" }} />)}
+              </div>
+              <button onClick={() => title.trim() && onConfirm({ title: title.trim(), color })} disabled={!title.trim()} style={{ ...primBtn(!title.trim()), width: "100%" }}>Comenzar</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // MAIN APP
+    // ═══════════════════════════════════════════════════════════
+    function App() {
+      const isMobile = useMobile();
+
+      const [user, setUser] = useState(null);
+      const [authReady, setAuthReady] = useState(false);
+      const [apiKey, setApiKey] = useState(null);
+      const [showSettings, setShowSettings] = useState(false);
+      const [screen, setScreen] = useState("loading");
+      const [library, setLibrary] = useState([]);
+      const [activeBook, setActiveBook] = useState(null);
+      const [showLibrary, setShowLibrary] = useState(false);
+      const [newBookType, setNewBookType] = useState(null);
+      const [sidebarOpen, setSidebarOpen] = useState(false);
+      const [savedAt, setSavedAt] = useState(null);
+      const [syncStatus, setSyncStatus] = useState("synced");
+      const [view, setView] = useState("engine");
+      const [busy, setBusy] = useState(false);
+      const [aiField, setAiField] = useState(null);
+      const [toast, setToast] = useState(null);
+      const [modal, setModal] = useState(null);
+
+      // Story Engine
+      const [idea, setIdea] = useState("");
+      const [synopsis, setSynopsis] = useState("");
+      const [outline, setOutline] = useState("");
+      const [beats, setBeats] = useState("");
+      const [prose, setProse] = useState("");
+      const [step, setStep] = useState(0);
+
+      // Manuscript
+      const [manuscript, setManuscript] = useState("");
+      const [selText, setSelText] = useState("");
+      const [selRange, setSelRange] = useState([0, 0]);
+      const [showTools, setShowTools] = useState(false);
+      const taRef = useRef(null);
+
+      // Characters
+      const [characters, setCharacters] = useState([]);
+      const [charForm, setCharForm] = useState(null);
+
+      // World
+      const [worldData, setWorldData] = useState(EW);
+
+      // Structure
+      const [structure, setStructure] = useState(ES);
+
+      // Escaleta
+      const [escaleta, setEscaleta] = useState([]);
+      const [escaletaForm, setEscaletaForm] = useState(null);
+
+      // Chapters
+      const [chapters, setChapters] = useState([]);
+
+      // Codex & Lorebook
+      const [codex, setCodex] = useState([]);
+      const [codexForm, setCodexForm] = useState(null);
+      const [lorebook, setLorebook] = useState([]);
+      const [lbForm, setLbForm] = useState(null);
+
+      // Brainstorm
+      const [bsCat, setBsCat] = useState("nombres");
+      const [bsCtx, setBsCtx] = useState("");
+      const [bsResults, setBsResults] = useState([]);
+      const [bsFavs, setBsFavs] = useState([]);
+
+      // Mapa
+      const [mapNodes, setMapNodes] = useState([]);
+      const [mapLinks, setMapLinks] = useState([]);
+      const [mapFilter, setMapFilter] = useState("all");
+      const [addNodeForm, setAddNodeForm] = useState(null);
+      const [addLinkForm, setAddLinkForm] = useState(null);
+      const svgRef = useRef(null);
+
+      // Arcos
+      const [arcos, setArcos] = useState([]);
+      const [arcosForm, setArcosForm] = useState(null);
+
+      // Publish
+      const [pubFormat, setPubFormat] = useState(null);
+      const [pubSource, setPubSource] = useState("manuscript");
+      const [pubResult, setPubResult] = useState("");
+      const [pubBusy, setPubBusy] = useState(false);
+      const [pubOpts, setPubOpts] = useState({ tone: "", selOpt: "" });
+
+      // Google Docs
+      const [linkedDocId, setLinkedDocId] = useState(null);
+      const [docSyncStatus, setDocSyncStatus] = useState("idle");
+
+      const showToast = msg => { setToast(msg); setTimeout(() => setToast(null), 4500); };
+
+      const saveField = useCallback(async (key, value) => {
+        if (!activeBook?.id || !user?.uid) return;
+        setSyncStatus("syncing");
+        const success = await saveBookData(user.uid, activeBook.id, key, value);
+        if (success) { setSavedAt(new Date().toISOString()); setSyncStatus("synced"); }
+        else setSyncStatus("offline");
+      }, [activeBook?.id, user?.uid]);
+
+      const loadBook = useCallback(async (book) => {
+        if (!user?.uid) return;
+        setActiveBook(book);
+        setIdea(await loadBookData(user.uid, book.id, "idea", ""));
+        setSynopsis(await loadBookData(user.uid, book.id, "synopsis", ""));
+        setOutline(await loadBookData(user.uid, book.id, "outline", ""));
+        setBeats(await loadBookData(user.uid, book.id, "beats", ""));
+        setProse(await loadBookData(user.uid, book.id, "prose", ""));
+        setStep(await loadBookData(user.uid, book.id, "step", 0));
+        setManuscript(await loadBookData(user.uid, book.id, "manuscript", ""));
+        setCharacters(await loadBookData(user.uid, book.id, "characters", []));
+        setWorldData(await loadBookData(user.uid, book.id, "world", EW));
+        setStructure(await loadBookData(user.uid, book.id, "structure", ES));
+        setEscaleta(await loadBookData(user.uid, book.id, "escaleta", []));
+        setChapters(await loadBookData(user.uid, book.id, "chapters", []));
+        setCodex(await loadBookData(user.uid, book.id, "codex", []));
+        setLorebook(await loadBookData(user.uid, book.id, "lorebook", []));
+        setBsFavs(await loadBookData(user.uid, book.id, "bsfavs", []));
+        setMapNodes(await loadBookData(user.uid, book.id, "mapnodes", []));
+        setMapLinks(await loadBookData(user.uid, book.id, "maplinks", []));
+        setArcos(await loadBookData(user.uid, book.id, "arcos", []));
+        setLinkedDocId(await loadBookData(user.uid, book.id, "linkedDocId", null));
+        setView("engine");
+        setSidebarOpen(false);
+      }, [user?.uid]);
+
+      const openBook = async (book) => { await loadBook(book); setScreen("app"); setShowLibrary(false); };
+      const createBook = async (data) => {
+        if (!user?.uid) return;
+        const book = { id: newBookId(), title: data.title, color: data.color, createdAt: new Date().toISOString(), lastEdited: new Date().toISOString(), wordCount: 0 };
+        const newLib = [book, ...library];
+        setLibrary(newLib);
+        await saveLibrary(user.uid, newLib);
+        setNewBookType(null);
+        openBook(book);
+      };
+      const deleteBook = async (bookId) => {
+        if (!user?.uid) return;
+        const newLib = library.filter(b => b.id !== bookId);
+        setLibrary(newLib);
+        await saveLibrary(user.uid, newLib);
+        if (activeBook?.id === bookId) { setActiveBook(null); setScreen("home"); }
+      };
+      const handleSaveApiKey = async (key) => {
+        if (user?.uid) await saveApiKey(user.uid, key);
+        setApiKey(key);
+        setShowSettings(false);
+        if (screen === "setup") setScreen("home");
+      };
+
+      // CONTEXTO COMPLETO PARA IA
+      const buildFullContext = useCallback(() => {
+        let ctx = "### CONTEXTO DE LA HISTORIA ###\n";
+        if (characters.length) {
+          ctx += "\n## PERSONAJES EXISTENTES (NO INVENTES NUEVOS) ##\n";
+          characters.forEach(c => ctx += `- ${c.name}: ${c.role} - ${c.appearance || ""}\n`);
+        }
+        if (codex.length) {
+          ctx += "\n## CODEX ##\n";
+          codex.forEach(e => ctx += `- ${e.name}: ${e.desc}\n`);
+        }
+        if (structure.theme) ctx += `\n## TEMA ##\n${structure.theme}\n`;
+        if (worldData.tone) ctx += `\n## TONO ##\n${worldData.tone}\n`;
+        ctx += "\n## IMPORTANTE ##\nNO inventes personajes nuevos. Usa SOLO los listados arriba.\n";
+        return ctx;
+      }, [characters, codex, structure, worldData]);
+
+      const aiGenWithContext = async (prompt, sys, setter, key, max = 800) => {
+        if (!apiKey) { showToast("⚠ Configura API Key"); return; }
+        setBusy(true); setAiField(key);
+        try {
+          const r = await callAI([{ role: "user", content: prompt }], buildFullContext() + "\n" + (sys || ""), max, apiKey);
+          setter(r.trim());
+        } catch (e) { showToast("⚠ " + e.message); }
+        setBusy(false); setAiField(null);
+      };
+
+      const genEngine = async () => {
+        if (!apiKey) { showToast("⚠ Configura API Key"); return; }
+        setBusy(true);
+        try {
+          if (step === 0) {
+            const r = await callAI([{ role: "user", content: "Crea sinopsis de 4 párrafos: " + idea }], buildFullContext(), 800, apiKey);
+            setSynopsis(r); await saveField("synopsis", r); setStep(1); await saveField("step", 1);
+          } else if (step === 1) {
+            const r = await callAI([{ role: "user", content: "Esquema 12 capítulos: " + synopsis }], buildFullContext(), 1000, apiKey);
+            setOutline(r); await saveField("outline", r); setStep(2); await saveField("step", 2);
+          } else if (step === 2) {
+            const r = await callAI([{ role: "user", content: "Story beats primeros 3 capítulos: " + outline }], buildFullContext(), 1000, apiKey);
+            setBeats(r); await saveField("beats", r); setStep(3); await saveField("step", 3);
+          } else if (step === 3) {
+            const r = await callAI([{ role: "user", content: "Primer capítulo completo: " + beats }], buildFullContext(), 1200, apiKey);
+            setProse(r); await saveField("prose", r); setStep(4); await saveField("step", 4);
+          }
+        } catch (e) { showToast("⚠ " + e.message); }
+        setBusy(false);
+      };
+
+      const handleSel = () => {
+        const ta = taRef.current;
+        if (!ta) return;
+        const s = ta.value.substring(ta.selectionStart, ta.selectionEnd).trim();
+        if (s.length > 3) { setSelText(s); setSelRange([ta.selectionStart, ta.selectionEnd]); setShowTools(true); }
+        else setShowTools(false);
+      };
+
+      const insertResult = text => {
+        const n = manuscript.substring(0, selRange[0]) + text + manuscript.substring(selRange[1]);
+        setManuscript(n); saveField("manuscript", n); setModal(null); setShowTools(false);
+      };
+
+      const openDescribe = async () => {
+        if (!apiKey) { showToast("⚠ Configura API Key"); return; }
+        setBusy(true); setModal({ type: "describe", results: null, original: selText });
+        try {
+          const raw = await callAI([{ role: "user", content: `JSON con descripciones sensoriales para: "${selText}"` }], buildFullContext() + "\nResponde SOLO JSON: {\"vista\":\"\",\"olfato\":\"\",\"tacto\":\"\",\"oído\":\"\",\"gusto\":\"\",\"metáfora\":\"\"}", 700, apiKey);
+          const match = raw.match(/\{[\s\S]*\}/);
+          const parsed = match ? JSON.parse(match[0]) : { error: "Error" };
+          setModal({ type: "describe", results: parsed, original: selText });
+        } catch (e) { setModal({ type: "describe", results: { error: e.message }, original: selText }); }
+        setBusy(false);
+      };
+
+      const openRewrite = async (mode) => {
+        if (!apiKey) { showToast("⚠ Configura API Key"); return; }
+        setBusy(true); setModal({ type: "rewrite", mode, results: null, original: selText });
+        const prompts = { descriptivo: "Reescribe más descriptivo", intenso: "Más intenso", corto: "Más conciso", pov: "Cambia POV", cliffhanger: "Termina en cliffhanger", giro: "Añade giro", tension: "Aumenta tensión", dialogo: "Convierte en diálogo", flashback: "Haz flashback", foreshadow: "Añade presagio", metafora: "Añade metáforas", ritmo: "Altera ritmo" };
+        try {
+          const r = await callAI([{ role: "user", content: `${prompts[mode]}: "${selText}"\n\nImportante: Mantén los personajes existentes.` }], buildFullContext(), 800, apiKey);
+          setModal({ type: "rewrite", mode, results: r, original: selText });
+        } catch (e) { showToast("⚠ " + e.message); setModal(null); }
+        setBusy(false);
+      };
+
+      const runBrainstorm = async () => {
+        if (!apiKey) { showToast("⚠ Configura API Key"); return; }
+        setBusy(true);
+        try {
+          const r = await callAI([{ role: "user", content: `Genera 10 ideas sobre "${bsCat}"${bsCtx ? ` contexto: ${bsCtx}` : ""}. Una por línea.` }], buildFullContext(), 600, apiKey);
+          setBsResults(r.split("\n").map(l => l.replace(/^[\-•\d.]\s*/, "").trim()).filter(Boolean).slice(0, 10));
+        } catch (e) { showToast("⚠ " + e.message); }
+        setBusy(false);
+      };
+
+      // CRUD con guardado
+      const saveCharacters = async (newChars) => { setCharacters(newChars); await saveField("characters", newChars); };
+      const saveChar = async (ch) => {
+        const n = ch.id ? characters.map(x => x.id === ch.id ? ch : x) : [...characters, { ...ch, id: Date.now().toString() }];
+        await saveCharacters(n); setCharForm(null);
+      };
+      const delChar = async (id) => { await saveCharacters(characters.filter(c => c.id !== id)); };
+
+      const saveWorld = async (w) => { setWorldData(w); await saveField("world", w); };
+      const saveStructure = async (s) => { setStructure(s); await saveField("structure", s); };
+
+      const saveEscaleta = async (newEsc) => { setEscaleta(newEsc); await saveField("escaleta", newEsc); };
+      const saveEsc = async (e) => {
+        const n = e.id ? escaleta.map(x => x.id === e.id ? e : x) : [...escaleta, { ...e, id: Date.now().toString() }];
+        await saveEscaleta(n); setEscaletaForm(null);
+      };
+      const delEsc = async (id) => { await saveEscaleta(escaleta.filter(e => e.id !== id)); };
+
+      const saveCodexList = async (newCodex) => { setCodex(newCodex); await saveField("codex", newCodex); };
+      const saveCodex = async (e) => {
+        const n = e.id ? codex.map(x => x.id === e.id ? e : x) : [...codex, { ...e, id: Date.now().toString() }];
+        await saveCodexList(n); setCodexForm(null);
+      };
+      const delCodex = async (id) => { await saveCodexList(codex.filter(e => e.id !== id)); };
+
+      const saveLorebook = async (newLb) => { setLorebook(newLb); await saveField("lorebook", newLb); };
+      const saveLb = async (entry) => {
+        const e = { ...entry, keywords: entry.kws ? entry.kws.split(",").map(k => k.trim()) : [] };
+        delete e.kws;
+        const n = e.id ? lorebook.map(l => l.id === e.id ? e : l) : [...lorebook, { ...e, id: Date.now().toString() }];
+        await saveLorebook(n); setLbForm(null);
+      };
+      const delLb = async (id) => { await saveLorebook(lorebook.filter(e => e.id !== id)); };
+
+      const saveChapters = async (newCh) => { setChapters(newCh); await saveField("chapters", newCh); };
+      const addCh = async () => { await saveChapters([...chapters, { id: Date.now().toString(), title: "Capítulo " + (chapters.length + 1), notes: "", status: "draft" }]); };
+      const updCh = async (id, ch) => { await saveChapters(chapters.map(c => c.id === id ? { ...c, ...ch } : c)); };
+      const delCh = async (id) => { await saveChapters(chapters.filter(c => c.id !== id)); };
+
+      const saveArcos = async (newArcos) => { setArcos(newArcos); await saveField("arcos", newArcos); };
+      const saveArco = async (arco) => {
+        const n = arco.id ? arcos.map(a => a.id === arco.id ? arco : a) : [...arcos, { ...arco, id: Date.now().toString() }];
+        await saveArcos(n); setArcosForm(null);
+      };
+      const delArco = async (id) => { await saveArcos(arcos.filter(a => a.id !== id)); };
+
+      const saveMapNodesList = async (newNodes) => { setMapNodes(newNodes); await saveField("mapnodes", newNodes); };
+      const saveMapLinksList = async (newLinks) => { setMapLinks(newLinks); await saveField("maplinks", newLinks); };
+      const saveMapNode = async (form) => {
+        await saveMapNodesList([...mapNodes, { id: "cn-" + Date.now(), label: form.label, type: "custom" }]);
+        setAddNodeForm(null);
+      };
+      const saveMapLink = async (form) => {
+        await saveMapLinksList([...mapLinks, { id: "ml-" + Date.now(), source: form.source, target: form.target, label: form.label || "" }]);
+        setAddLinkForm(null);
+      };
+      const delMapLink = async (id) => { await saveMapLinksList(mapLinks.filter(l => l.id !== id)); };
+      const delMapNode = async (id) => {
+        await saveMapNodesList(mapNodes.filter(n => n.id !== id));
+        await saveMapLinksList(mapLinks.filter(l => l.source !== id && l.target !== id));
+      };
+
+      const buildAllMapNodes = useCallback(() => {
+        const nodes = [];
+        characters.forEach(c => nodes.push({ id: "c-" + c.id, label: c.name, type: c.role, group: "cast" }));
+        codex.forEach(e => nodes.push({ id: "cx-" + e.id, label: e.name, type: e.type || "otro", group: "world" }));
+        escaleta.forEach(e => nodes.push({ id: "es-" + e.id, label: e.title, type: "escena", group: "plot" }));
+        arcos.forEach(a => nodes.push({ id: "ar-" + a.id, label: a.title, type: "structure", group: "plot" }));
+        mapNodes.forEach(n => nodes.push({ ...n, group: "custom" }));
+        return nodes;
+      }, [characters, codex, escaleta, arcos, mapNodes]);
+
+      useEffect(() => {
+        if (view !== "mapa" || !svgRef.current || !buildAllMapNodes().length) return;
+        const allNodes = buildAllMapNodes();
+        const filtered = mapFilter === "all" ? allNodes : allNodes.filter(n => ({ cast: "cast", world: "world", plot: "plot" }[mapFilter] === n.group));
+        const nodeIds = new Set(filtered.map(n => n.id));
+        const links = mapLinks.filter(l => nodeIds.has(l.source) && nodeIds.has(l.target));
+        const nodes = filtered.map(n => ({ ...n }));
+        const el = svgRef.current;
+        const { width: W, height: H } = el.getBoundingClientRect();
+        const svg = d3.select(el);
+        svg.selectAll("*").remove();
+        const defs = svg.append("defs");
+        defs.append("marker").attr("id", "arr").attr("viewBox", "0 -4 8 8").attr("refX", 32).attr("refY", 0).attr("markerWidth", 5).attr("markerHeight", 5).attr("orient", "auto").append("path").attr("d", "M0,-4L8,0L0,4").attr("fill", "#c4b5fd");
+        const g = svg.append("g");
+        const zoom = d3.zoom().scaleExtent([.2, 4]).on("zoom", e => g.attr("transform", e.transform));
+        svg.call(zoom);
+        const sim = d3.forceSimulation(nodes)
+          .force("link", d3.forceLink(links).id(d => d.id).distance(150))
+          .force("charge", d3.forceManyBody().strength(-400))
+          .force("center", d3.forceCenter(W / 2, H / 2))
+          .force("collide", d3.forceCollide(60));
+        const link = g.append("g").selectAll("line").data(links).join("line").attr("stroke", "#c4b5fd").attr("stroke-width", 2).attr("marker-end", "url(#arr)");
+        const ltext = g.append("g").selectAll("text").data(links.filter(l => l.label)).join("text").text(d => d.label).attr("font-size", 9).attr("fill", C.light).attr("text-anchor", "middle");
+        const drag = d3.drag().on("start", (e, d) => { if (!e.active) sim.alphaTarget(.3).restart(); d.fx = d.x; d.fy = d.y; }).on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); });
+        const node = g.append("g").selectAll("g").data(nodes).join("g").call(drag).style("cursor", "grab");
+        node.append("circle").attr("r", 24).attr("fill", d => (NODE_C[d.type] || "#6b7280") + "20").attr("stroke", d => NODE_C[d.type] || "#6b7280").attr("stroke-width", 2);
+        node.append("circle").attr("r", 12).attr("fill", d => (NODE_C[d.type] || "#6b7280") + "50");
+        node.append("text").text(d => d.label?.length > 12 ? d.label.slice(0, 11) + "…" : d.label).attr("text-anchor", "middle").attr("dy", "2.5em").attr("font-size", 10);
+        node.append("title").text(d => d.label);
+        sim.on("tick", () => {
+          link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+          ltext.attr("x", d => (d.source.x + d.target.x) / 2).attr("y", d => (d.source.y + d.target.y) / 2 - 8);
+          node.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
+        });
+        setTimeout(() => svg.transition().duration(600).call(zoom.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(.8)), 100);
+        return () => sim.stop();
+      }, [view, buildAllMapNodes, mapLinks, mapFilter]);
+
+      const getSourceText = () => {
+        if (pubSource === "manuscript") return manuscript;
+        if (pubSource === "synopsis") return synopsis;
+        return manuscript;
+      };
+      const generatePublication = async () => {
+        const fmt = PUB_FORMATS.find(f => f.id === pubFormat);
+        if (!fmt) return;
+        const src = getSourceText();
+        if (!src.trim()) { showToast("⚠ Sin contenido."); return; }
+        setPubBusy(true);
+        try {
+          const r = await callAI([{ role: "user", content: `Adapta al formato "${fmt.label}". Opción: ${pubOpts.selOpt || fmt.optList[0]}. Texto:\n${src.substring(0, 6000)}` }], buildFullContext(), 1500, apiKey);
+          setPubResult(r);
+        } catch (e) { showToast("⚠ " + e.message); }
+        setPubBusy(false);
+      };
+      const copyPub = async () => { try { await navigator.clipboard.writeText(pubResult); showToast("✓ Copiado"); } catch { } };
+      const downloadPub = () => {
+        const fmt = PUB_FORMATS.find(f => f.id === pubFormat);
+        const blob = new Blob([pubResult], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = (activeBook?.title || "novela") + "-" + (fmt?.id || "export") + ".txt";
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+      const exportProject = () => {
+        const blob = new Blob([JSON.stringify({ characters, codex, lorebook, arcos, mapNodes, mapLinks, worldData, structure, escaleta, chapters }, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "novelai-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+      const importProject = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async ev => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            if (data.characters) await saveCharacters(data.characters);
+            if (data.codex) await saveCodexList(data.codex);
+            if (data.lorebook) await saveLorebook(data.lorebook);
+            if (data.arcos) await saveArcos(data.arcos);
+            if (data.mapNodes) await saveMapNodesList(data.mapNodes);
+            if (data.mapLinks) await saveMapLinksList(data.mapLinks);
+            if (data.worldData) await saveWorld(data.worldData);
+            if (data.structure) await saveStructure(data.structure);
+            if (data.escaleta) await saveEscaleta(data.escaleta);
+            if (data.chapters) await saveChapters(data.chapters);
+            showToast("✓ Importado");
+          } catch { showToast("⚠ Error"); }
+        };
+        reader.readAsText(file);
+        e.target.value = "";
+      };
+
+      const handleLinkGoogleDoc = async () => {
+        if (!user?.uid || !activeBook) return;
+        setDocSyncStatus("syncing");
+        try {
+          const docId = await _gDocsCreate(activeBook.title + " — NovelAI");
+          if (manuscript.trim()) await _gDocsWrite(docId, manuscript);
+          setLinkedDocId(docId);
+          await saveField("linkedDocId", docId);
+          setDocSyncStatus("synced");
+          showToast("✓ Google Doc vinculado");
+          window.open(`https://docs.google.com/document/d/${docId}/edit`, "_blank");
+        } catch (e) { setDocSyncStatus("error"); showToast("⚠ " + e.message); }
+      };
+      const handlePushToDoc = async () => {
+        if (!linkedDocId) return;
+        setDocSyncStatus("syncing");
+        try { await _gDocsWrite(linkedDocId, manuscript); setDocSyncStatus("synced"); showToast("✓ Enviado"); }
+        catch (e) { setDocSyncStatus("error"); showToast("⚠ " + e.message); }
+      };
+      const handlePullFromDoc = async () => {
+        if (!linkedDocId) return;
+        setDocSyncStatus("syncing");
+        try { const text = await _gDocsRead(linkedDocId); setManuscript(text); await saveField("manuscript", text); setDocSyncStatus("synced"); showToast("✓ Importado"); }
+        catch (e) { setDocSyncStatus("error"); showToast("⚠ " + e.message); }
+      };
+      const handleUnlinkDoc = async () => {
+        if (!confirm("¿Desvincular?")) return;
+        setLinkedDocId(null);
+        await saveField("linkedDocId", null);
+        setDocSyncStatus("idle");
+      };
+
+      useEffect(() => {
+        const unsub = fbAuth.onAuthStateChanged(async (fbUser) => {
+          setUser(fbUser);
+          setAuthReady(true);
+          if (fbUser) {
+            const key = await loadApiKey(fbUser.uid);
+            setApiKey(key);
+            const lib = await loadLibrary(fbUser.uid);
+            setLibrary(lib);
+            setScreen(key ? "home" : "setup");
+          } else { setApiKey(null); setLibrary([]); setScreen("login"); }
+        });
+        return unsub;
+      }, []);
+
+      useEffect(() => {
+        if (activeBook && user?.uid) {
+          const wc = manuscript.split(/\s+/).filter(Boolean).length;
+          const updatedLib = library.map(b => b.id === activeBook.id ? { ...b, wordCount: wc, lastEdited: new Date().toISOString() } : b);
+          setLibrary(updatedLib);
+          saveLibrary(user.uid, updatedLib);
+        }
+      }, [manuscript]);
+
+      if (!authReady) return <div style={{ width: "100vw", height: "100vh", background: "#0c0a14" }} />;
+      if (screen === "login") return <LoginScreen />;
+      if (screen === "setup") return <ApiKeySetup onSave={handleSaveApiKey} />;
+      if (screen === "home") return (
+        <>
+          <DeskScene library={library} user={user} onNewBook={() => setNewBookType("new")} onOpenLibrary={() => setShowLibrary(true)} onSettings={() => setShowSettings(true)} onOpenRecent={book => book && openBook(book)} />
+          {showLibrary && <LibraryPanel library={library} onOpen={openBook} onDelete={deleteBook} onClose={() => setShowLibrary(false)} />}
+          {newBookType && <NewBookModal onConfirm={createBook} onClose={() => setNewBookType(null)} />}
+          {showSettings && <SettingsModal user={user} currentKey={apiKey} onSave={handleSaveApiKey} onClose={() => setShowSettings(false)} />}
+          {toast && <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: C.accent, color: "#fff", padding: "12px 20px", borderRadius: 999, zIndex: 2000 }}>{toast}</div>}
+        </>
+      );
+
+      // ═══════════════════════════════════════════════════════════
+      // APP SCREEN - VISTAS COMPLETAS
+      // ═══════════════════════════════════════════════════════════
+      return (
+        <div style={{ display: "flex", height: "100vh", background: C.bg, overflow: "hidden" }}>
+          {isMobile && sidebarOpen && <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 299 }} />}
+          {isMobile && (
+            <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 52, background: C.surface, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", zIndex: 200 }}>
+              <button onClick={() => setSidebarOpen(s => !s)} style={{ background: "none", border: "none", fontSize: 20 }}>☰</button>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{activeBook?.title || "NovelAI"}</div>
+              <button onClick={() => setScreen("home")} style={{ background: "none", border: "none", fontSize: 18 }}>🏠</button>
+            </div>
+          )}
+          <div className={`app-sidebar${isMobile && sidebarOpen ? " open" : ""}`} style={{ width: 210, background: C.surface, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" }}>
+            <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.borderL}`, cursor: "pointer" }} onClick={() => { setScreen("home"); setSidebarOpen(false); }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 9, height: 9, borderRadius: 2, background: activeBook?.color || C.accent }} />
+                <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{activeBook?.title || "Sin título"}</div>
+              </div>
+              <div style={{ fontSize: 10, color: C.light }}>← Escritorio</div>
+            </div>
+            <div style={{ padding: "8px 16px", background: C.aSoft, borderBottom: `1px solid ${C.borderL}` }}>
+              <div style={{ fontSize: 10, color: savedAt ? C.green : C.light }}>{savedAt ? "✓ Guardado" : "Sin guardar"}</div>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "8px 6px" }}>
+              {NAV.map(g => (
+                <div key={g.group} style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: C.light, textTransform: "uppercase", padding: "4px 10px" }}>{g.group}</div>
+                  {g.items.map(item => (
+                    <button key={item.id} onClick={() => { setView(item.id); if (isMobile) setSidebarOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 12px", width: "100%", background: view === item.id ? C.aLight : "transparent", border: "none", borderRadius: 10, color: view === item.id ? C.accent : C.mid, cursor: "pointer", fontSize: 13, textAlign: "left", fontWeight: view === item.id ? 600 : 400 }}>
+                      <span style={{ fontSize: 14, width: 18 }}>{item.icon}</span><span>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: "0 8px 8px" }}>
+              <div style={{ display: "flex", gap: 5, marginBottom: 5 }}>
+                <button onClick={exportProject} style={{ flex: 1, padding: "7px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.surface, fontSize: 11 }}>⬇ Export</button>
+                <label style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "7px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.surface, fontSize: 11 }}>
+                  ⬆ Import<input type="file" accept=".json" onChange={importProject} style={{ display: "none" }} />
+                </label>
+              </div>
+              <div style={{ marginBottom: 5, padding: "10px", borderRadius: 10, border: `1px solid ${linkedDocId ? "#0f9d5844" : "rgba(15,157,88,0.2)"}` }}>
+                {!linkedDocId ? (
+                  <button onClick={handleLinkGoogleDoc} style={{ width: "100%", background: "none", border: "none", color: "#0f9d58", fontSize: 11 }}>📄 Vincular Google Doc</button>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button onClick={handlePushToDoc} style={{ flex: 1, padding: "5px", borderRadius: 8, background: "rgba(15,157,88,0.08)", color: "#0a7a45", fontSize: 10 }}>↑ Push</button>
+                      <button onClick={handlePullFromDoc} style={{ flex: 1, padding: "5px", borderRadius: 8, background: "rgba(15,157,88,0.08)", color: "#0a7a45", fontSize: 10 }}>↓ Pull</button>
+                      <button onClick={() => window.open(`https://docs.google.com/document/d/${linkedDocId}/edit`, "_blank")} style={{ flex: 1, padding: "5px", borderRadius: 8, background: "rgba(15,157,88,0.08)", color: "#0a7a45", fontSize: 10 }}>↗ Abrir</button>
+                    </div>
+                    <button onClick={handleUnlinkDoc} style={{ width: "100%", marginTop: 6, padding: "4px", background: "none", border: "none", color: C.light, fontSize: 10 }}>Desvincular</button>
+                  </>
+                )}
+              </div>
+              <button onClick={() => { setShowSettings(true); setSidebarOpen(false); }} style={{ width: "100%", padding: "7px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.light, fontSize: 11 }}>⚙ Ajustes</button>
+            </div>
+          </div>
+
+          <div className="app-main" style={{ flex: 1, overflowY: "auto", padding: isMobile ? "60px 16px 80px" : "36px 48px" }}>
+            {/* STORY ENGINE */}
+            {view === "engine" && (
+              <div style={{ maxWidth: 760 }}>
+                <SecHdr title="Story Engine" />
+                <div style={{ display: "flex", marginBottom: 32 }}>
+                  {["Idea", "Sinopsis", "Esquema", "Beats", "Prosa"].map((s, i) => (
+                    <div key={i} style={{ flex: 1, textAlign: "center" }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 999, background: i < step ? C.accent : i === step ? C.surface : C.bg, border: `2px solid ${i <= step ? C.accent : C.border}`, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>{i < step ? "✓" : i + 1}</div>
+                      <div style={{ fontSize: 10, color: i <= step ? C.accent : C.light }}>{s}</div>
+                    </div>
+                  ))}
+                </div>
+                <Fld label="Tu Idea" value={idea} onChange={async v => { setIdea(v); await saveField("idea", v); }} ta h={100} />
+                {step >= 1 && <Fld label="Sinopsis" value={synopsis} onChange={async v => { setSynopsis(v); await saveField("synopsis", v); }} ta h={150} />}
+                {step >= 2 && <Fld label="Esquema" value={outline} onChange={async v => { setOutline(v); await saveField("outline", v); }} ta h={200} />}
+                {step >= 3 && <Fld label="Beats" value={beats} onChange={async v => { setBeats(v); await saveField("beats", v); }} ta h={180} />}
+                {step >= 4 && (
+                  <div style={card}>
+                    <label style={fLb}>Prosa Generada</label>
+                    <textarea value={prose} onChange={async e => { setProse(e.target.value); await saveField("prose", e.target.value); }} style={{ ...fIn, minHeight: 320 }} />
+                    <button onClick={() => { setManuscript(manuscript + (manuscript ? "\n\n" : "") + prose); saveField("manuscript", manuscript + (manuscript ? "\n\n" : "") + prose); setView("manuscript"); }} style={ghostBtn}>Enviar al Manuscrito →</button>
+                  </div>
+                )}
+                {step < 4 && <button onClick={genEngine} disabled={busy || !idea.trim()} style={primBtn(busy || !idea.trim())}>{busy ? "⏳" : "✦ " + ["Generar Sinopsis", "Generar Esquema", "Generar Beats", "Generar Prosa"][step]}</button>}
+              </div>
+            )}
+
+            {/* MANUSCRITO */}
+            {view === "manuscript" && (
+              <div style={{ maxWidth: 820 }}>
+                <SecHdr title="Manuscrito" />
+                {showTools && (
+                  <div style={{ ...card, marginBottom: 16, padding: "14px 16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                      <span style={{ fontSize: 12, color: C.mid, fontStyle: "italic" }}>«{selText.substring(0, 40)}»</span>
+                      <button onClick={() => setShowTools(false)} style={{ background: "none", border: "none", fontSize: 16 }}>✕</button>
+                    </div>
+                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                      <button onClick={openDescribe} style={pill(false, true)}>🌿 Describir</button>
+                      {TOOLS_MS.filter(t => t.group === "estilo").map(t => <button key={t.id} onClick={() => openRewrite(t.id)} style={pill(false, true)}>{t.label}</button>)}
+                      {TOOLS_MS.filter(t => t.group === "drama").map(t => <button key={t.id} onClick={() => openRewrite(t.id)} style={pill(false, true)}>{t.label}</button>)}
+                      {TOOLS_MS.filter(t => t.group === "narrative").map(t => <button key={t.id} onClick={() => openRewrite(t.id)} style={pill(false, true)}>{t.label}</button>)}
+                    </div>
+                  </div>
+                )}
+                <textarea ref={taRef} value={manuscript} onChange={async e => { const v = e.target.value; setManuscript(v); await saveField("manuscript", v); }} onMouseUp={handleSel} onKeyUp={handleSel} placeholder="Escribe aquí tu novela…" style={{ width: "100%", minHeight: 500, background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 14, padding: isMobile ? "20px" : "36px", fontSize: isMobile ? 16 : 18, lineHeight: 2, resize: "vertical", outline: "none" }} />
+                <div style={{ marginTop: 8, fontSize: 12, color: C.light }}>{manuscript.split(/\s+/).filter(Boolean).length} palabras</div>
+              </div>
+            )}
+
+            {/* BRAINSTORM */}
+            {view === "brainstorm" && (
+              <div style={{ maxWidth: 680 }}>
+                <SecHdr title="Brainstorm" />
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+                  {["nombres", "giros", "objetos mágicos", "locaciones", "facciones", "conflictos"].map(cat => (
+                    <button key={cat} onClick={() => setBsCat(cat)} style={pill(bsCat === cat, true)}>{cat}</button>
+                  ))}
+                </div>
+                <Fld label="Contexto" value={bsCtx} onChange={setBsCtx} ta h={64} />
+                <button onClick={runBrainstorm} disabled={busy} style={primBtn(busy)}>{busy ? "⏳" : "✦ Generar 10 Ideas"}</button>
+                {bsResults.length > 0 && (
+                  <div style={{ ...card, marginTop: 20, padding: 0 }}>
+                    {bsResults.map((r, i) => (
+                      <div key={i} style={{ padding: "13px 18px", borderBottom: i < bsResults.length - 1 ? `1px solid ${C.borderL}` : "none", display: "flex", justifyContent: "space-between" }}>
+                        <span>{r}</span>
+                        <button onClick={() => { const n = bsFavs.includes(r) ? bsFavs.filter(x => x !== r) : [...bsFavs, r]; setBsFavs(n); saveField("bsfavs", n); }} style={{ background: "none", border: "none", fontSize: 17, opacity: bsFavs.includes(r) ? 1 : .2 }}>⭐</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* MAPA */}
+            {view === "mapa" && (
+              <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                <div style={{ padding: "14px 20px", background: C.surface, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flexShrink: 0 }}>
+                  <span style={{ fontWeight: 500 }}>Mapa Mental</span>
+                  {[["all", "Todos"], ["cast", "Personajes"], ["world", "Mundo"], ["plot", "Trama"]].map(([f, l]) => (
+                    <button key={f} onClick={() => setMapFilter(f)} style={pill(mapFilter === f, true)}>{l}</button>
+                  ))}
+                  <button onClick={() => setAddNodeForm({ label: "" })} style={ghostBtn}>+ Nodo</button>
+                  <button onClick={() => setAddLinkForm({ source: "", target: "", label: "" })} style={ghostBtn}>🔗 Conectar</button>
+                </div>
+                <div style={{ flex: 1, position: "relative", background: C.bg, minHeight: 400 }}>
+                  <svg ref={svgRef} style={{ width: "100%", height: "100%" }} />
+                  {buildAllMapNodes().length === 0 && (
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.light }}>
+                      Añade personajes o codex para ver el mapa
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TABLERO */}
+            {view === "planning" && (
+              <div style={{ maxWidth: 720 }}>
+                <SecHdr title="Tablero" action={<button onClick={addCh} style={primBtn(false)}>+ Capítulo</button>} />
+                {chapters.map((ch, idx) => (
+                  <div key={ch.id} style={{ ...card, marginBottom: 10, padding: "14px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <span style={{ color: C.accent, fontSize: 11, fontWeight: 700, minWidth: 22 }}>{String(idx + 1).padStart(2, "0")}</span>
+                      <input value={ch.title} onChange={e => updCh(ch.id, { title: e.target.value })} style={{ flex: 1, background: "transparent", border: "none", borderBottom: `1px solid ${C.borderL}`, padding: "3px 0", outline: "none" }} />
+                      <select value={ch.status} onChange={e => updCh(ch.id, { status: e.target.value })} style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11 }}>
+                        <option value="draft">Borrador</option><option value="wip">En progreso</option><option value="done">Listo</option>
+                      </select>
+                      <button onClick={() => delCh(ch.id)} style={{ background: "none", border: "none", fontSize: 14 }}>✕</button>
+                    </div>
+                    <textarea value={ch.notes || ""} onChange={e => updCh(ch.id, { notes: e.target.value })} placeholder="Notas..." style={{ ...fIn, minHeight: 60, fontSize: 13 }} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ESCALETA */}
+            {view === "escaleta" && (
+              <div style={{ maxWidth: 720 }}>
+                <SecHdr title="Escaleta" action={<button onClick={() => setEscaletaForm({ ...EE })} style={primBtn(false)}>+ Escena</button>} />
+                {escaleta.map((e, i) => (
+                  <div key={e.id} style={{ ...card, marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ width: 26, height: 26, borderRadius: 999, background: C.aLight, color: C.accent, display: "flex", alignItems: "center", justifyContent: "center" }}>{i + 1}</span>
+                        <span style={{ fontWeight: 600 }}>{e.title || "Sin título"}</span>
+                      </div>
+                      <div><button onClick={() => setEscaletaForm({ ...e })} style={ghostBtn}>✏</button><button onClick={() => delEsc(e.id)} style={{ ...ghostBtn, color: C.red }}>✕</button></div>
+                    </div>
+                    {e.summary && <p style={{ color: C.mid, fontSize: 13 }}>{e.summary}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ESTRUCTURA */}
+            {view === "structure" && (
+              <div style={{ maxWidth: 780 }}>
+                <SecHdr title="Estructura" />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div style={card}><Fld label="Premisa" value={structure.premise} onChange={async v => { setStructure({ ...structure, premise: v }); await saveStructure({ ...structure, premise: v }); }} ta h={80} /><AiBtn label="Generar" busy={busy && aiField === "premise"} onClick={() => aiGenWithContext("Genera una premisa atractiva", "", v => setStructure({ ...structure, premise: v }), "premise")} /></div>
+                  <div style={card}><Fld label="Tema" value={structure.theme} onChange={async v => { setStructure({ ...structure, theme: v }); await saveStructure({ ...structure, theme: v }); }} ta h={80} /><AiBtn label="Generar" busy={busy && aiField === "theme"} onClick={() => aiGenWithContext("Identifica el tema central", "", v => setStructure({ ...structure, theme: v }), "theme")} /></div>
+                  <div style={card}><Fld label="Incidente Incitador" value={structure.incitingIncident} onChange={async v => { setStructure({ ...structure, incitingIncident: v }); await saveStructure({ ...structure, incitingIncident: v }); }} ta h={80} /></div>
+                  <div style={card}><Fld label="Punto de Giro" value={structure.midpointTwist} onChange={async v => { setStructure({ ...structure, midpointTwist: v }); await saveStructure({ ...structure, midpointTwist: v }); }} ta h={80} /></div>
+                  <div style={card}><Fld label="Noche Oscura" value={structure.darkNight} onChange={async v => { setStructure({ ...structure, darkNight: v }); await saveStructure({ ...structure, darkNight: v }); }} ta h={80} /></div>
+                  <div style={card}><Fld label="Clímax" value={structure.climax} onChange={async v => { setStructure({ ...structure, climax: v }); await saveStructure({ ...structure, climax: v }); }} ta h={80} /></div>
+                </div>
+                <div style={card}><Fld label="Plot Twists" value={structure.plotTwists} onChange={async v => { setStructure({ ...structure, plotTwists: v }); await saveStructure({ ...structure, plotTwists: v }); }} ta h={100} /></div>
+              </div>
+            )}
+
+            {/* PERSONAJES */}
+            {view === "characters" && (
+              <div style={{ maxWidth: 860 }}>
+                <SecHdr title="Personajes" action={<button onClick={() => setCharForm({ ...EC })} style={primBtn(false)}>+ Personaje</button>} />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 14 }}>
+                  {characters.map(ch => (
+                    <div key={ch.id} style={card}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                        <div><div style={{ fontSize: 16, fontWeight: 600 }}>{ch.name || "Sin nombre"}</div><Tag color={NODE_C[ch.role]}>{ROLE_LBL[ch.role]}</Tag></div>
+                        <div><button onClick={() => setCharForm({ ...ch })} style={ghostBtn}>✏</button><button onClick={() => delChar(ch.id)} style={{ ...ghostBtn, color: C.red }}>✕</button></div>
+                      </div>
+                      {ch.appearance && <p style={{ color: C.mid, fontSize: 13 }}>{ch.appearance}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* MUNDO */}
+            {view === "world" && (
+              <div style={{ maxWidth: 780 }}>
+                <SecHdr title="Mundo" />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  {[{ k: "genre", l: "Género" }, { k: "magicRules", l: "Reglas de Magia" }, { k: "geography", l: "Geografía" }, { k: "society", l: "Sociedad" }].map(f => (
+                    <div key={f.k} style={card}><Fld label={f.l} value={worldData[f.k] || ""} onChange={async v => { setWorldData({ ...worldData, [f.k]: v }); await saveWorld({ ...worldData, [f.k]: v }); }} ta h={80} /></div>
+                  ))}
+                </div>
+                <div style={card}><Fld label="Tono" value={worldData.tone} onChange={async v => { setWorldData({ ...worldData, tone: v }); await saveWorld({ ...worldData, tone: v }); }} ta h={80} /></div>
+              </div>
+            )}
+
+            {/* VOZ */}
+            {view === "voice" && (
+              <div style={{ maxWidth: 780 }}>
+                <SecHdr title="Voz y Técnica" />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div style={card}>
+                    <label style={fLb}>Punto de Vista</label>
+                    {[{ id: "firstPerson", l: "1ª Persona" }, { id: "thirdClose", l: "3ª Cercana" }, { id: "thirdOmni", l: "3ª Omnisciente" }].map(opt => (
+                      <div key={opt.id} onClick={() => { setStructure({ ...structure, pov: opt.id }); saveStructure({ ...structure, pov: opt.id }); }} style={{ padding: "10px 12px", marginBottom: 7, background: structure.pov === opt.id ? C.aSoft : C.bg, border: `1.5px solid ${structure.pov === opt.id ? C.accent : C.border}`, borderRadius: 10, cursor: "pointer" }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: structure.pov === opt.id ? C.accent : C.text }}>{opt.l}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={card}><Fld label="Premisa" value={structure.premise} onChange={async v => { setStructure({ ...structure, premise: v }); await saveStructure({ ...structure, premise: v }); }} ta h={100} /></div>
+                </div>
+              </div>
+            )}
+
+            {/* CODEX */}
+            {view === "codex" && (
+              <div style={{ maxWidth: 720 }}>
+                <SecHdr title="Codex" action={<button onClick={() => setCodexForm({ name: "", type: "personaje", desc: "" })} style={primBtn(false)}>+ Añadir</button>} />
+                {["personaje", "lugar", "objeto", "mitología", "otro"].map(type => {
+                  const entries = codex.filter(e => e.type === type);
+                  if (!entries.length) return null;
+                  return (
+                    <div key={type} style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.light, textTransform: "uppercase", marginBottom: 8 }}>{type}s</div>
+                      {entries.map(e => (
+                        <div key={e.id} style={{ ...card, marginBottom: 8, display: "flex", justifyContent: "space-between" }}>
+                          <div><div style={{ fontWeight: 600 }}>{e.name}</div><div style={{ color: C.mid, fontSize: 13 }}>{e.desc}</div></div>
+                          <div><button onClick={() => setCodexForm({ ...e })} style={ghostBtn}>✏</button><button onClick={() => delCodex(e.id)} style={{ ...ghostBtn, color: C.red }}>✕</button></div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* LOREBOOK */}
+            {view === "lorebook" && (
+              <div style={{ maxWidth: 720 }}>
+                <SecHdr title="Lorebook" action={<button onClick={() => setLbForm({ kws: "", content: "" })} style={primBtn(false)}>+ Añadir</button>} />
+                {lorebook.map(e => (
+                  <div key={e.id} style={{ ...card, marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
+                    <div><div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>{(e.keywords || []).map(kw => <Tag key={kw}>{kw}</Tag>)}</div><div style={{ color: C.mid, fontSize: 13 }}>{e.content}</div></div>
+                    <div><button onClick={() => setLbForm({ ...e, kws: (e.keywords || []).join(", ") })} style={ghostBtn}>✏</button><button onClick={() => delLb(e.id)} style={{ ...ghostBtn, color: C.red }}>✕</button></div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ARCOS ARGUMENTALES */}
+            {view === "arcos" && (
+              <div style={{ maxWidth: 860 }}>
+                <SecHdr title="Arcos Argumentales" sub="La evolución de tus personajes" action={<button onClick={() => setArcosForm({ ...ARCO_DEFAULT, id: "", characterId: "", characterName: "" })} style={primBtn(false)}>+ Arco</button>} />
+                {arcos.length === 0 && <div style={{ ...card, textAlign: "center", padding: 48, color: C.light }}>Crea arcos argumentales para tus personajes.</div>}
+                {arcos.map(arco => {
+                  const personaje = characters.find(c => c.id === arco.characterId);
+                  return (
+                    <div key={arco.id} style={{ ...card, marginBottom: 16 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                        <div><div style={{ fontSize: 18, fontWeight: 600, color: C.accent }}>{arco.title || "Arco sin título"}</div><div style={{ fontSize: 12, color: C.mid }}>{personaje?.name || arco.characterName || "Personaje no seleccionado"}</div></div>
+                        <div><button onClick={() => setArcosForm({ ...arco })} style={ghostBtn}>✏</button><button onClick={() => delArco(arco.id)} style={{ ...ghostBtn, color: C.red }}>✕</button></div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                        <div style={{ background: C.bg, borderRadius: 10, padding: 12 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: C.accent }}>ACTO I</div>
+                          <p style={{ fontSize: 12, color: C.mid }}>{arco.act1Desc || "—"}</p>
+                          {arco.act1Conflict && <p style={{ fontSize: 11, color: C.red }}>⚔ {arco.act1Conflict}</p>}
+                        </div>
+                        <div style={{ background: C.bg, borderRadius: 10, padding: 12 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: C.yellow }}>ACTO II</div>
+                          <p style={{ fontSize: 12, color: C.mid }}>{arco.act2Desc || "—"}</p>
+                          {arco.act2Midpoint && <p style={{ fontSize: 11, color: C.blue }}>⤷ {arco.act2Midpoint}</p>}
+                        </div>
+                        <div style={{ background: C.bg, borderRadius: 10, padding: 12 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: C.green }}>ACTO III</div>
+                          <p style={{ fontSize: 12, color: C.mid }}>{arco.act3Desc || "—"}</p>
+                          {arco.act3Resolution && <p style={{ fontSize: 11, color: C.green }}>✓ {arco.act3Resolution}</p>}
+                        </div>
+                      </div>
+                      {arco.notes && <div style={{ marginTop: 12, padding: "8px 12px", background: C.aSoft, borderRadius: 8, fontSize: 12 }}>📝 {arco.notes}</div>}
+                      <div style={{ marginTop: 8, fontSize: 11, color: C.light }}>Estado: {arco.status === "planned" ? "📋 Planificado" : arco.status === "writing" ? "✍ Escribiendo" : "✓ Completado"}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* PUBLICAR */}
+            {view === "publicar" && (
+              <div style={{ maxWidth: 880 }}>
+                <SecHdr title="Publicar" />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 8, marginBottom: 28 }}>
+                  {PUB_FORMATS.map(f => (
+                    <div key={f.id} onClick={() => { setPubFormat(f.id); setPubResult(""); setPubOpts({ tone: "", selOpt: f.optList[0] }); }} style={{ ...card, cursor: "pointer", border: `2px solid ${pubFormat === f.id ? f.color : C.border}`, padding: 12 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: pubFormat === f.id ? f.color : C.text }}>{f.icon} {f.label}</div>
+                    </div>
+                  ))}
+                </div>
+                {pubFormat && (
+                  <div style={{ display: "grid", gridTemplateColumns: "250px 1fr", gap: 20 }}>
+                    <div style={card}>
+                      <select value={pubSource} onChange={e => setPubSource(e.target.value)} style={fIn}>
+                        <option value="manuscript">Manuscrito</option><option value="synopsis">Sinopsis</option>
+                      </select>
+                      <select value={pubOpts.selOpt} onChange={e => setPubOpts(p => ({ ...p, selOpt: e.target.value }))} style={{ ...fIn, marginTop: 12 }}>
+                        {PUB_FORMATS.find(f => f.id === pubFormat)?.optList.map(o => <option key={o}>{o}</option>)}
+                      </select>
+                      <button onClick={generatePublication} disabled={pubBusy} style={{ ...primBtn(pubBusy), width: "100%", marginTop: 16 }}>{pubBusy ? "⏳" : "✦ Adaptar"}</button>
+                    </div>
+                    {pubResult && (
+                      <div style={card}>
+                        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                          <button onClick={copyPub} style={ghostBtn}>📋 Copiar</button>
+                          <button onClick={downloadPub} style={ghostBtn}>⬇ .txt</button>
+                        </div>
+                        <div style={{ background: C.bg, borderRadius: 12, padding: "20px", fontSize: 14, lineHeight: 1.8, whiteSpace: "pre-wrap", maxHeight: 500, overflowY: "auto" }}>{pubResult}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* MODALES */}
+          {modal && (
+            <Modal title={modal.type === "describe" ? "Descripciones Sensoriales" : "Reescritura"} onClose={() => setModal(null)}>
+              {busy && <div>Cargando...</div>}
+              {modal.type === "describe" && modal.results && !busy && (
+                <div>
+                  {Object.entries(modal.results).map(([sense, text]) => text && (
+                    <div key={sense} style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: C.accent, textTransform: "uppercase" }}>{sense}</div>
+                      <div onClick={() => insertResult(text)} style={{ padding: "12px", background: C.bg, borderRadius: 10, cursor: "pointer", marginBottom: 8 }}>{text}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {modal.type === "rewrite" && modal.results && !busy && (
+                <div>
+                  <div style={{ padding: "12px", background: C.bg, borderRadius: 10, marginBottom: 16, fontSize: 14 }}>{modal.results}</div>
+                  <button onClick={() => insertResult(modal.results)} style={primBtn(false)}>✓ Reemplazar</button>
+                </div>
+              )}
+            </Modal>
+          )}
+
+          {charForm && (
+            <Modal title={charForm.id ? "Editar Personaje" : "Nuevo Personaje"} onClose={() => setCharForm(null)}>
+              <Fld label="Nombre" value={charForm.name} onChange={v => setCharForm(f => ({ ...f, name: v }))} />
+              <div style={{ marginBottom: 16 }}><label style={fLb}>Rol</label><select value={charForm.role} onChange={e => setCharForm(f => ({ ...f, role: e.target.value }))} style={fIn}><option value="protagonist">Protagonista</option><option value="antagonist">Antagonista</option><option value="secondary">Secundario</option><option value="mentor">Mentor</option><option value="other">Otro</option></select></div>
+              <Fld label="Apariencia" value={charForm.appearance || ""} onChange={v => setCharForm(f => ({ ...f, appearance: v }))} ta h={70} />
+              <button onClick={() => saveChar(charForm)} disabled={!charForm.name.trim()} style={{ ...primBtn(!charForm.name.trim()), width: "100%", marginTop: 8 }}>Guardar</button>
+            </Modal>
+          )}
+
+          {codexForm && (
+            <Modal title={codexForm.id ? "Editar" : "Nueva entrada"} onClose={() => setCodexForm(null)}>
+              <Fld label="Nombre" value={codexForm.name} onChange={v => setCodexForm(f => ({ ...f, name: v }))} />
+              <div style={{ marginBottom: 16 }}><label style={fLb}>Tipo</label><select value={codexForm.type} onChange={e => setCodexForm(f => ({ ...f, type: e.target.value }))} style={fIn}><option value="personaje">Personaje</option><option value="lugar">Lugar</option><option value="objeto">Objeto</option><option value="mitología">Mitología</option><option value="otro">Otro</option></select></div>
+              <Fld label="Descripción" value={codexForm.desc || ""} onChange={v => setCodexForm(f => ({ ...f, desc: v }))} ta h={100} />
+              <button onClick={() => saveCodex(codexForm)} disabled={!codexForm.name.trim()} style={{ ...primBtn(!codexForm.name.trim()), width: "100%" }}>Guardar</button>
+            </Modal>
+          )}
+
+          {lbForm && (
+            <Modal title={lbForm.id ? "Editar" : "Nueva entrada"} onClose={() => setLbForm(null)}>
+              <Fld label="Palabras clave (separadas por coma)" value={lbForm.kws || ""} onChange={v => setLbForm(f => ({ ...f, kws: v }))} />
+              <Fld label="Información" value={lbForm.content || ""} onChange={v => setLbForm(f => ({ ...f, content: v }))} ta h={120} />
+              <button onClick={() => saveLb(lbForm)} disabled={!lbForm.kws?.trim()} style={{ ...primBtn(!lbForm.kws?.trim()), width: "100%" }}>Guardar</button>
+            </Modal>
+          )}
+
+          {escaletaForm && (
+            <Modal title={escaletaForm.id ? "Editar Escena" : "Nueva Escena"} onClose={() => setEscaletaForm(null)}>
+              <Fld label="Título" value={escaletaForm.title} onChange={v => setEscaletaForm(f => ({ ...f, title: v }))} />
+              <Fld label="Resumen" value={escaletaForm.summary || ""} onChange={v => setEscaletaForm(f => ({ ...f, summary: v }))} ta h={80} />
+              <button onClick={() => saveEsc(escaletaForm)} disabled={!escaletaForm.title.trim()} style={{ ...primBtn(!escaletaForm.title.trim()), width: "100%" }}>Guardar</button>
+            </Modal>
+          )}
+
+          {arcosForm && (
+            <Modal title={arcosForm.id ? "Editar Arco" : "Nuevo Arco"} onClose={() => setArcosForm(null)} wide>
+              <Fld label="Título del Arco" value={arcosForm.title} onChange={v => setArcosForm(f => ({ ...f, title: v }))} />
+              <div style={{ marginBottom: 16 }}><label style={fLb}>Personaje</label><select value={arcosForm.characterId} onChange={e => { const ch = characters.find(c => c.id === e.target.value); setArcosForm(f => ({ ...f, characterId: e.target.value, characterName: ch?.name || "" })); }} style={fIn}><option value="">Seleccionar personaje</option>{characters.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div><label style={fLb}>Acto I - Descripción</label><textarea value={arcosForm.act1Desc || ""} onChange={e => setArcosForm(f => ({ ...f, act1Desc: e.target.value }))} style={fIn} rows={2} /></div>
+                <div><label style={fLb}>Conflicto Acto I</label><textarea value={arcosForm.act1Conflict || ""} onChange={e => setArcosForm(f => ({ ...f, act1Conflict: e.target.value }))} style={fIn} rows={2} /></div>
+                <div><label style={fLb}>Acto II - Desarrollo</label><textarea value={arcosForm.act2Desc || ""} onChange={e => setArcosForm(f => ({ ...f, act2Desc: e.target.value }))} style={fIn} rows={2} /></div>
+                <div><label style={fLb}>Punto Medio</label><textarea value={arcosForm.act2Midpoint || ""} onChange={e => setArcosForm(f => ({ ...f, act2Midpoint: e.target.value }))} style={fIn} rows={2} /></div>
+                <div><label style={fLb}>Acto III - Resolución</label><textarea value={arcosForm.act3Desc || ""} onChange={e => setArcosForm(f => ({ ...f, act3Desc: e.target.value }))} style={fIn} rows={2} /></div>
+                <div><label style={fLb}>Cierre / Lección</label><textarea value={arcosForm.act3Resolution || ""} onChange={e => setArcosForm(f => ({ ...f, act3Resolution: e.target.value }))} style={fIn} rows={2} /></div>
+              </div>
+              <Fld label="Notas adicionales" value={arcosForm.notes || ""} onChange={v => setArcosForm(f => ({ ...f, notes: v }))} ta h={60} />
+              <div style={{ marginBottom: 16 }}><label style={fLb}>Estado</label><select value={arcosForm.status} onChange={e => setArcosForm(f => ({ ...f, status: e.target.value }))} style={fIn}><option value="planned">Planificado</option><option value="writing">Escribiendo</option><option value="completed">Completado</option></select></div>
+              <button onClick={() => saveArco(arcosForm)} disabled={!arcosForm.title.trim() || !arcosForm.characterId} style={{ ...primBtn(!arcosForm.title.trim() || !arcosForm.characterId), width: "100%" }}>Guardar Arco</button>
+            </Modal>
+          )}
+
+          {addNodeForm && (
+            <Modal title="Añadir Nodo" onClose={() => setAddNodeForm(null)}>
+              <Fld label="Nombre del nodo" value={addNodeForm.label} onChange={v => setAddNodeForm(f => ({ ...f, label: v }))} />
+              <button onClick={() => saveMapNode(addNodeForm)} disabled={!addNodeForm.label.trim()} style={{ ...primBtn(!addNodeForm.label.trim()), width: "100%" }}>Añadir</button>
+            </Modal>
+          )}
+
+          {addLinkForm && buildAllMapNodes().length >= 2 && (
+            <Modal title="Crear Conexión" onClose={() => setAddLinkForm(null)}>
+              <div style={{ marginBottom: 14 }}><label style={fLb}>Desde</label><select value={addLinkForm.source} onChange={e => setAddLinkForm(f => ({ ...f, source: e.target.value }))} style={fIn}>{buildAllMapNodes().map(n => <option key={n.id} value={n.id}>{n.label}</option>)}</select></div>
+              <div style={{ marginBottom: 14 }}><label style={fLb}>Hacia</label><select value={addLinkForm.target} onChange={e => setAddLinkForm(f => ({ ...f, target: e.target.value }))} style={fIn}>{buildAllMapNodes().map(n => <option key={n.id} value={n.id}>{n.label}</option>)}</select></div>
+              <Fld label="Etiqueta (opcional)" value={addLinkForm.label || ""} onChange={v => setAddLinkForm(f => ({ ...f, label: v }))} />
+              <button onClick={() => saveMapLink(addLinkForm)} disabled={addLinkForm.source === addLinkForm.target} style={{ ...primBtn(addLinkForm.source === addLinkForm.target), width: "100%" }}>Crear Conexión</button>
+            </Modal>
+          )}
+
+          {toast && <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: C.accent, color: "#fff", padding: "12px 20px", borderRadius: 999, zIndex: 2000 }}>{toast}</div>}
+          {showSettings && <SettingsModal user={user} currentKey={apiKey} onSave={handleSaveApiKey} onClose={() => setShowSettings(false)} />}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+  </script>
+</body>
+
+</html>
