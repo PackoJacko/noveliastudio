@@ -23,30 +23,19 @@
       margin: 0;
       padding: 0;
     }
-
     html, body, #root {
       height: 100%;
       width: 100%;
       overflow: hidden;
     }
-
     body {
       font-family: Georgia, serif;
       background: #0c0a14;
     }
-
-    /* Animaciones */
     @keyframes spin {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
     }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Scrollbar */
     ::-webkit-scrollbar {
       width: 5px;
       height: 5px;
@@ -58,7 +47,6 @@
       background: rgba(124, 58, 237, 0.3);
       border-radius: 999px;
     }
-
     @media (max-width: 768px) {
       .app-sidebar {
         position: fixed !important;
@@ -183,6 +171,88 @@
     };
 
     // ============================================================
+    // GOOGLE DOCS SYNC (simplificado para evitar errores)
+    // ============================================================
+    const GDOCS_CLIENT_ID = "1095225113205-mp91no1an5vip1fu7526hfrri8pvken3.apps.googleusercontent.com";
+    const GDOCS_SCOPES = "https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file";
+
+    let _gTokenClient = null;
+    let _gAccessToken = null;
+    let _gTokenExpiry = 0;
+
+    function _ensureGDocsToken() {
+      return new Promise((resolve, reject) => {
+        if (_gAccessToken && Date.now() < _gTokenExpiry - 60000) { resolve(_gAccessToken); return; }
+        if (!window.google?.accounts?.oauth2) { reject(new Error("Google Identity Services no cargado aún.")); return; }
+        if (!_gTokenClient) {
+          _gTokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: GDOCS_CLIENT_ID,
+            scope: GDOCS_SCOPES,
+            callback: () => {},
+          });
+        }
+        _gTokenClient.callback = (resp) => {
+          if (resp.error) { reject(new Error("Error: " + resp.error)); return; }
+          _gAccessToken = resp.access_token;
+          _gTokenExpiry = Date.now() + (resp.expires_in || 3600) * 1000;
+          resolve(_gAccessToken);
+        };
+        _gTokenClient.requestAccessToken({ prompt: _gAccessToken ? "" : "consent" });
+      });
+    }
+
+    async function _gDocsCreate(title) {
+      const token = await _ensureGDocsToken();
+      const res = await fetch("https://docs.googleapis.com/v1/documents", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      if (!res.ok) throw new Error("No se pudo crear el documento");
+      const doc = await res.json();
+      return doc.documentId;
+    }
+
+    async function _gDocsWrite(docId, text) {
+      const token = await _ensureGDocsToken();
+      const getRes = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
+        headers: { "Authorization": "Bearer " + token },
+      });
+      if (!getRes.ok) throw new Error("No se pudo leer el documento");
+      const doc = await getRes.json();
+      const content = doc.body?.content || [];
+      const lastEl = content[content.length - 1];
+      const endIndex = lastEl ? (lastEl.endIndex - 1) : 1;
+      const requests = [];
+      if (endIndex > 1) requests.push({ deleteContentRange: { range: { startIndex: 1, endIndex } } });
+      if (text) requests.push({ insertText: { location: { index: 1 }, text } });
+      if (!requests.length) return;
+      await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ requests }),
+      });
+    }
+
+    async function _gDocsRead(docId) {
+      const token = await _ensureGDocsToken();
+      const res = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
+        headers: { "Authorization": "Bearer " + token },
+      });
+      if (!res.ok) throw new Error("No se pudo leer el documento");
+      const doc = await res.json();
+      let text = "";
+      for (const el of (doc.body?.content || [])) {
+        if (el.paragraph) {
+          for (const pe of (el.paragraph.elements || [])) {
+            if (pe.textRun?.content) text += pe.textRun.content;
+          }
+        }
+      }
+      return text.trimEnd();
+    }
+
+    // ============================================================
     // API
     // ============================================================
     async function callAI(messages, system = "", max = 1000, apiKey) {
@@ -245,6 +315,16 @@
     const ES = { premise: "", theme: "", pov: "thirdClose", incitingIncident: "", midpointTwist: "", darkNight: "", climax: "", plotTwists: "" };
     const EE = { title: "", summary: "", goal: "", conflict: "", hook: "" };
     const ARCO_DEFAULT = { id: "", characterId: "", characterName: "", title: "", act1Desc: "", act1Conflict: "", act2Desc: "", act2Midpoint: "", act3Desc: "", act3Resolution: "", status: "planned", notes: "" };
+
+    // PUBLICAR FORMATOS (DEFINIDOS CORRECTAMENTE)
+    const PUB_FORMATS = [
+      { id: "libro", icon: "📚", label: "Libro / Novela", color: "#7c3aed", optList: ["Formato editorial estándar", "Revisar estilo literario", "Normalizar diálogos"] },
+      { id: "cuento", icon: "🧒", label: "Cuento Infantil", color: "#f59e0b", optList: ["Edad 3-6 años", "Edad 7-10 años", "Edad 11-14 años"] },
+      { id: "blog", icon: "🌐", label: "Web / Blog", color: "#3b82f6", optList: ["Subtítulos H2/H3", "Tono divulgativo", "Incluir CTA"] },
+      { id: "wattpad", icon: "📖", label: "Wattpad", color: "#f97316", optList: ["Nota de autor", "Cliffhanger final", "Resumen anterior"] },
+      { id: "twitter", icon: "𝕏", label: "Hilo X / Twitter", color: "#1a1825", optList: ["Hilo de 10 tweets", "Hilo de 15 tweets", "Hilo de 20 tweets"] },
+      { id: "instagram", icon: "📸", label: "Instagram", color: "#ec4899", optList: ["Tono emotivo", "Hashtags literarios"] },
+    ];
 
     function useMobile() {
       const [mob, setMob] = useState(window.innerWidth < 768);
@@ -536,6 +616,10 @@
       const [pubBusy, setPubBusy] = useState(false);
       const [pubOpts, setPubOpts] = useState({ tone: "", selOpt: "" });
 
+      // Google Docs
+      const [linkedDocId, setLinkedDocId] = useState(null);
+      const [docSyncStatus, setDocSyncStatus] = useState("idle");
+
       const showToast = msg => { setToast(msg); setTimeout(() => setToast(null), 4500); };
 
       const saveField = useCallback(async (key, value) => {
@@ -567,6 +651,7 @@
         setMapNodes(await loadBookData(user.uid, book.id, "mapnodes", []));
         setMapLinks(await loadBookData(user.uid, book.id, "maplinks", []));
         setArcos(await loadBookData(user.uid, book.id, "arcos", []));
+        setLinkedDocId(await loadBookData(user.uid, book.id, "linkedDocId", null));
         setView("engine");
         setSidebarOpen(false);
       }, [user?.uid]);
@@ -751,45 +836,144 @@
         return nodes;
       }, [characters, codex, escaleta, arcos, mapNodes]);
 
-      // Efecto del mapa
+      // Efecto del mapa - CORREGIDO para mostrar conexiones
       useEffect(() => {
         if (view !== "mapa" || !svgRef.current) return;
         const allNodes = buildAllMapNodes();
         if (!allNodes.length) return;
+        
         const filtered = mapFilter === "all" ? allNodes : allNodes.filter(n => ({ cast: "cast", world: "world", plot: "plot" }[mapFilter] === n.group));
         const nodeIds = new Set(filtered.map(n => n.id));
         const links = mapLinks.filter(l => nodeIds.has(l.source) && nodeIds.has(l.target));
-        const nodes = filtered.map(n => ({ ...n }));
+        const nodes = filtered.map(n => ({ ...n, x: Math.random() * 600, y: Math.random() * 400 }));
+        
         const el = svgRef.current;
-        const { width: W, height: H } = el.getBoundingClientRect();
-        if (W === 0 || H === 0) return;
+        const rect = el.getBoundingClientRect();
+        const width = rect.width || 800;
+        const height = rect.height || 500;
+        
         const svg = d3.select(el);
         svg.selectAll("*").remove();
+        
+        // Definir flecha para conexiones
         const defs = svg.append("defs");
-        defs.append("marker").attr("id", "arr").attr("viewBox", "0 -4 8 8").attr("refX", 32).attr("refY", 0).attr("markerWidth", 5).attr("markerHeight", 5).attr("orient", "auto").append("path").attr("d", "M0,-4L8,0L0,4").attr("fill", "#c4b5fd");
+        defs.append("marker")
+          .attr("id", "arrow")
+          .attr("viewBox", "0 -5 10 10")
+          .attr("refX", 28)
+          .attr("refY", 0)
+          .attr("markerWidth", 6)
+          .attr("markerHeight", 6)
+          .attr("orient", "auto")
+          .append("path")
+          .attr("d", "M0,-5L10,0L0,5")
+          .attr("fill", "#c4b5fd");
+        
         const g = svg.append("g");
-        const zoom = d3.zoom().scaleExtent([.2, 4]).on("zoom", e => g.attr("transform", e.transform));
-        svg.call(zoom);
-        const sim = d3.forceSimulation(nodes)
-          .force("link", d3.forceLink(links).id(d => d.id).distance(150))
-          .force("charge", d3.forceManyBody().strength(-400))
-          .force("center", d3.forceCenter(W / 2, H / 2))
-          .force("collide", d3.forceCollide(60));
-        const link = g.append("g").selectAll("line").data(links).join("line").attr("stroke", "#c4b5fd").attr("stroke-width", 2).attr("marker-end", "url(#arr)");
-        const ltext = g.append("g").selectAll("text").data(links.filter(l => l.label)).join("text").text(d => d.label).attr("font-size", 9).attr("fill", C.light).attr("text-anchor", "middle");
-        const drag = d3.drag().on("start", (e, d) => { if (!e.active) sim.alphaTarget(.3).restart(); d.fx = d.x; d.fy = d.y; }).on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); });
-        const node = g.append("g").selectAll("g").data(nodes).join("g").call(drag).style("cursor", "grab");
-        node.append("circle").attr("r", 24).attr("fill", d => (NODE_C[d.type] || "#6b7280") + "20").attr("stroke", d => NODE_C[d.type] || "#6b7280").attr("stroke-width", 2);
-        node.append("circle").attr("r", 12).attr("fill", d => (NODE_C[d.type] || "#6b7280") + "50");
-        node.append("text").text(d => d.label?.length > 12 ? d.label.slice(0, 11) + "…" : d.label).attr("text-anchor", "middle").attr("dy", "2.5em").attr("font-size", 10);
-        node.append("title").text(d => d.label);
-        sim.on("tick", () => {
-          link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
-          ltext.attr("x", d => (d.source.x + d.target.x) / 2).attr("y", d => (d.source.y + d.target.y) / 2 - 8);
-          node.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
+        
+        // Zoom
+        const zoom = d3.zoom().scaleExtent([0.3, 3]).on("zoom", (e) => {
+          g.attr("transform", e.transform);
         });
-        setTimeout(() => svg.transition().duration(600).call(zoom.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(.8)), 100);
-        return () => sim.stop();
+        svg.call(zoom);
+        
+        // Fuerza de simulación
+        const simulation = d3.forceSimulation(nodes)
+          .force("link", d3.forceLink(links).id(d => d.id).distance(120).strength(0.5))
+          .force("charge", d3.forceManyBody().strength(-300))
+          .force("center", d3.forceCenter(width / 2, height / 2))
+          .force("collide", d3.forceCollide(50));
+        
+        // Dibujar conexiones (líneas)
+        const link = g.append("g")
+          .selectAll("line")
+          .data(links)
+          .join("line")
+          .attr("stroke", "#a78bfa")
+          .attr("stroke-width", 2)
+          .attr("stroke-dasharray", links.map(l => l.label ? "0" : "5,5"))
+          .attr("marker-end", "url(#arrow)");
+        
+        // Etiquetas de conexiones
+        const linkText = g.append("g")
+          .selectAll("text")
+          .data(links.filter(l => l.label))
+          .join("text")
+          .attr("font-size", 10)
+          .attr("fill", "#8b5cf6")
+          .attr("text-anchor", "middle")
+          .attr("dy", -5)
+          .text(d => d.label);
+        
+        // Dibujar nodos
+        const node = g.append("g")
+          .selectAll("g")
+          .data(nodes)
+          .join("g")
+          .call(d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended))
+          .style("cursor", "grab");
+        
+        node.append("circle")
+          .attr("r", 22)
+          .attr("fill", d => (NODE_C[d.type] || "#6b7280") + "30")
+          .attr("stroke", d => NODE_C[d.type] || "#6b7280")
+          .attr("stroke-width", 2);
+        
+        node.append("circle")
+          .attr("r", 12)
+          .attr("fill", d => (NODE_C[d.type] || "#6b7280") + "80");
+        
+        node.append("text")
+          .text(d => d.label?.length > 12 ? d.label.slice(0, 10) + "…" : d.label)
+          .attr("text-anchor", "middle")
+          .attr("dy", "2.2em")
+          .attr("font-size", 10)
+          .attr("fill", "#1a1825")
+          .attr("font-weight", 500);
+        
+        node.append("title")
+          .text(d => d.label);
+        
+        function dragstarted(event, d) {
+          if (!event.active) simulation.alphaTarget(0.3).restart();
+          d.fx = d.x;
+          d.fy = d.y;
+        }
+        
+        function dragged(event, d) {
+          d.fx = event.x;
+          d.fy = event.y;
+        }
+        
+        function dragended(event, d) {
+          if (!event.active) simulation.alphaTarget(0);
+          d.fx = null;
+          d.fy = null;
+        }
+        
+        simulation.on("tick", () => {
+          link
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
+          
+          linkText
+            .attr("x", d => (d.source.x + d.target.x) / 2)
+            .attr("y", d => (d.source.y + d.target.y) / 2 - 8);
+          
+          node.attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+        
+        // Ajustar zoom inicial
+        setTimeout(() => {
+          svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(0.8));
+        }, 100);
+        
+        return () => simulation.stop();
       }, [view, buildAllMapNodes, mapLinks, mapFilter]);
 
       // Publish
@@ -854,10 +1038,6 @@
         e.target.value = "";
       };
 
-      // Google Docs
-      const [linkedDocId, setLinkedDocId] = useState(null);
-      const [docSyncStatus, setDocSyncStatus] = useState("idle");
-
       const handleLinkGoogleDoc = async () => {
         if (!user?.uid || !activeBook) return;
         setDocSyncStatus("syncing");
@@ -915,7 +1095,6 @@
         }
       }, [manuscript]);
 
-      // Pantallas de carga y estados
       if (!authReady) {
         return (
           <div style={{ width: "100vw", height: "100vh", background: "#0c0a14", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -969,7 +1148,7 @@
       }
 
       // ============================================================
-      // APP SCREEN (con verificación de activeBook)
+      // APP SCREEN
       // ============================================================
       if (!activeBook) {
         return (
@@ -1029,12 +1208,27 @@
                   ⬆ Import<input type="file" accept=".json" onChange={importProject} style={{ display: "none" }} />
                 </label>
               </div>
+              <div style={{ marginBottom: 5, padding: "8px", borderRadius: 10, border: `1px solid ${linkedDocId ? "#0f9d5844" : "rgba(15,157,88,0.2)"}` }}>
+                {!linkedDocId ? (
+                  <button onClick={handleLinkGoogleDoc} style={{ width: "100%", background: "none", border: "none", color: "#0f9d58", fontSize: 11 }}>📄 Vincular Google Doc</button>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+                      <button onClick={handlePushToDoc} style={{ flex: 1, padding: "4px", borderRadius: 6, background: "rgba(15,157,88,0.1)", fontSize: 10 }}>↑ Push</button>
+                      <button onClick={handlePullFromDoc} style={{ flex: 1, padding: "4px", borderRadius: 6, background: "rgba(15,157,88,0.1)", fontSize: 10 }}>↓ Pull</button>
+                      <button onClick={() => window.open(`https://docs.google.com/document/d/${linkedDocId}/edit`, "_blank")} style={{ flex: 1, padding: "4px", borderRadius: 6, background: "rgba(15,157,88,0.1)", fontSize: 10 }}>↗ Abrir</button>
+                    </div>
+                    <button onClick={handleUnlinkDoc} style={{ width: "100%", padding: "3px", background: "none", border: "none", color: C.light, fontSize: 10 }}>Desvincular</button>
+                  </>
+                )}
+              </div>
               <button onClick={() => { setShowSettings(true); setSidebarOpen(false); }} style={{ width: "100%", padding: "7px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.light, fontSize: 11, cursor: "pointer" }}>⚙ Ajustes</button>
             </div>
           </div>
 
           {/* Main Content */}
           <div className="app-main" style={{ flex: 1, overflowY: "auto", padding: isMobile ? "60px 16px 80px" : "36px 48px" }}>
+            
             {/* Story Engine */}
             {view === "engine" && (
               <div style={{ maxWidth: 760 }}>
@@ -1135,8 +1329,15 @@
                 <div style={{ flex: 1, position: "relative", background: C.bg }}>
                   <svg ref={svgRef} style={{ width: "100%", height: "100%", minHeight: 400 }} />
                   {buildAllMapNodes().length === 0 && (
-                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.light, pointerEvents: "none" }}>
-                      Añade personajes o codex para ver el mapa
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.light, pointerEvents: "none", flexDirection: "column", gap: 8 }}>
+                      <div>📊</div>
+                      <div>Añade personajes o codex para ver el mapa</div>
+                      <div style={{ fontSize: 12 }}>Luego puedes crear conexiones entre ellos</div>
+                    </div>
+                  )}
+                  {buildAllMapNodes().length > 0 && mapLinks.length === 0 && (
+                    <div style={{ position: "absolute", bottom: 16, right: 16, background: "rgba(0,0,0,0.6)", color: "white", padding: "6px 12px", borderRadius: 8, fontSize: 11, pointerEvents: "none" }}>
+                      💡 Usa "🔗 Conectar" para crear relaciones entre nodos
                     </div>
                   )}
                 </div>
@@ -1351,42 +1552,57 @@
               </div>
             )}
 
-            {/* Publicar */}
-            {view === "publicar" && (
+            {/* Publicar - CORREGIDO */}
+            {view === "publicar" && PUB_FORMATS && (
               <div style={{ maxWidth: 880 }}>
-                <SecHdr title="Publicar" />
+                <SecHdr title="Publicar" sub="Adapta tu texto a diferentes formatos" />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 8, marginBottom: 28 }}>
                   {PUB_FORMATS.map(f => (
-                    <div key={f.id} onClick={() => { setPubFormat(f.id); setPubResult(""); setPubOpts({ tone: "", selOpt: f.optList[0] }); }} style={{ ...card, cursor: "pointer", border: `2px solid ${pubFormat === f.id ? f.color : C.border}`, padding: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: pubFormat === f.id ? f.color : C.text }}>{f.icon} {f.label}</div>
+                    <div key={f.id} onClick={() => { setPubFormat(f.id); setPubResult(""); setPubOpts({ tone: "", selOpt: f.optList[0] }); }} style={{ ...card, cursor: "pointer", border: `2px solid ${pubFormat === f.id ? f.color : C.border}`, padding: 12, textAlign: "center" }}>
+                      <div style={{ fontSize: 24 }}>{f.icon}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: pubFormat === f.id ? f.color : C.text }}>{f.label}</div>
                     </div>
                   ))}
                 </div>
-                {pubFormat && (
+                {pubFormat ? (
                   <div style={{ display: "grid", gridTemplateColumns: "250px 1fr", gap: 20 }}>
                     <div style={card}>
+                      <label style={fLb}>Fuente</label>
                       <select value={pubSource} onChange={e => setPubSource(e.target.value)} style={fIn}>
                         <option value="manuscript">Manuscrito</option>
                         <option value="synopsis">Sinopsis</option>
                       </select>
-                      <select value={pubOpts.selOpt} onChange={e => setPubOpts(p => ({ ...p, selOpt: e.target.value }))} style={{ ...fIn, marginTop: 12 }}>
+                      <label style={{ ...fLb, marginTop: 12 }}>Opción</label>
+                      <select value={pubOpts.selOpt} onChange={e => setPubOpts(p => ({ ...p, selOpt: e.target.value }))} style={fIn}>
                         {PUB_FORMATS.find(f => f.id === pubFormat)?.optList.map(o => <option key={o}>{o}</option>)}
                       </select>
-                      <button onClick={generatePublication} disabled={pubBusy} style={{ ...primBtn(pubBusy), width: "100%", marginTop: 16 }}>
-                        {pubBusy ? "⏳" : "✦ Adaptar"}
+                      <button onClick={generatePublication} disabled={pubBusy || !getSourceText().trim()} style={{ ...primBtn(pubBusy || !getSourceText().trim()), width: "100%", marginTop: 16 }}>
+                        {pubBusy ? "⏳ Adaptando..." : "✦ Adaptar"}
                       </button>
                     </div>
-                    {pubResult && (
-                      <div style={card}>
-                        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                          <button onClick={copyPub} style={ghostBtn}>📋 Copiar</button>
-                          <button onClick={downloadPub} style={ghostBtn}>⬇ .txt</button>
+                    <div style={card}>
+                      {pubResult ? (
+                        <>
+                          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                            <button onClick={copyPub} style={ghostBtn}>📋 Copiar</button>
+                            <button onClick={downloadPub} style={ghostBtn}>⬇ .txt</button>
+                          </div>
+                          <div style={{ background: C.bg, borderRadius: 12, padding: "20px", fontSize: 14, lineHeight: 1.8, whiteSpace: "pre-wrap", maxHeight: 500, overflowY: "auto" }}>
+                            {pubResult}
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ textAlign: "center", padding: 60, color: C.light }}>
+                          <div style={{ fontSize: 48, marginBottom: 12 }}>📄</div>
+                          <div>Selecciona un formato y haz clic en "Adaptar"</div>
                         </div>
-                        <div style={{ background: C.bg, borderRadius: 12, padding: "20px", fontSize: 14, lineHeight: 1.8, whiteSpace: "pre-wrap", maxHeight: 500, overflowY: "auto" }}>
-                          {pubResult}
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ ...card, textAlign: "center", padding: 60, color: C.light }}>
+                    <div style={{ fontSize: 48, marginBottom: 12 }}>🖨️</div>
+                    <div>Selecciona un formato arriba para comenzar</div>
                   </div>
                 )}
               </div>
