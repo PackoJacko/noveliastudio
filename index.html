@@ -1,0 +1,2521 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>NovelAI Studio</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✍</text></svg>"/>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <!-- Google Identity Services (Docs/Drive OAuth) -->
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <!-- Tu configuración Firebase (credenciales de tu proyecto) -->
+  <script>
+    firebase.initializeApp({
+      apiKey:            "AIzaSyD05j95pwiyual-sMUYgwvi1DsZoN2Yb-M",
+      authDomain:        "novelai-studio-87636.firebaseapp.com",
+      projectId:         "novelai-studio-87636",
+      storageBucket:     "novelai-studio-87636.firebasestorage.app",
+      messagingSenderId: "1095225113205",
+      appId:             "1:1095225113205:web:589e9b8e9a6e283b2c163c"
+    });
+    // Habilitar persistencia offline (funciona sin internet, sincroniza al reconectar)
+    firebase.firestore().enablePersistence({ synchronizeTabs: true })
+      .catch(e => console.warn('Offline persistence:', e.code));
+  </script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body,#root{height:100%;width:100%;overflow:hidden}
+    body{font-family:Georgia,serif;background:#f4f0e8;-webkit-tap-highlight-color:transparent}
+    ::-webkit-scrollbar{width:5px;height:5px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(124,58,237,0.3);border-radius:999px}
+    input,textarea,select{-webkit-appearance:none;appearance:none}
+    textarea{-webkit-overflow-scrolling:touch}
+    @keyframes steamRise{0%{transform:translateY(0) translateX(0) scaleX(1);opacity:.7}50%{transform:translateY(-18px) translateX(3px) scaleX(1.3);opacity:.4}100%{transform:translateY(-36px) translateX(-2px) scaleX(.8);opacity:0}}
+    @keyframes lampFlicker{0%,100%{opacity:1}90%{opacity:.97}91%{opacity:.8}92%{opacity:.97}96%{opacity:.9}}
+    @keyframes bookFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(-2deg)}}
+    @keyframes pageFlutter{0%,100%{transform:scaleX(1) skewY(0)}50%{transform:scaleX(.97) skewY(.5deg)}}
+    @keyframes cursorBlink{0%,100%{opacity:1}50%{opacity:0}}
+    @keyframes glowPulse{0%,100%{box-shadow:0 0 30px rgba(255,180,60,.2),0 0 60px rgba(255,140,20,.1)}50%{box-shadow:0 0 50px rgba(255,180,60,.35),0 0 100px rgba(255,140,20,.18)}}
+    @keyframes chainSway{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg)}}
+    @keyframes paperRustle{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(.5deg)}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes deskEntrance{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes savePop{0%{opacity:0;transform:scale(.8)}60%{transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}
+    @keyframes slideIn{from{transform:translateX(-100%)}to{transform:translateX(0)}}
+    .desk-hover{transition:transform .25s ease,filter .25s ease;cursor:pointer}
+    .desk-hover:hover{transform:translateY(-6px) scale(1.03);filter:brightness(1.15)}
+    .desk-hover:active{transform:translateY(-2px) scale(1.01)}
+    /* ── RESPONSIVE ─────────────────── */
+    @media(max-width:768px){
+      .app-sidebar{position:fixed!important;top:0!important;bottom:0!important;left:0!important;z-index:300!important;transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);box-shadow:none!important}
+      .app-sidebar.open{transform:translateX(0)!important;box-shadow:6px 0 24px rgba(0,0,0,0.35)!important}
+      .app-main{padding:60px 16px 80px!important}
+      .app-main-map{padding-top:52px!important}
+      .two-col{grid-template-columns:1fr!important}
+      .three-col{grid-template-columns:1fr!important}
+      .four-col{grid-template-columns:1fr 1fr!important}
+      .modal-box{max-width:100%!important;max-height:95vh!important;border-radius:20px 20px 0 0!important;margin-top:auto}
+      .modal-wrap{align-items:flex-end!important;padding:0!important}
+      .manuscript-area{padding:20px 20px!important;font-size:16px!important}
+      .pub-layout{grid-template-columns:1fr!important}
+      .desk-scene{overflow:hidden}
+    }
+  </style>
+</head>
+<body><div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// ═══════════════════════════════════════════════════════════
+// FIREBASE REFS
+// ═══════════════════════════════════════════════════════════
+const fbAuth = firebase.auth();
+const fbDb   = firebase.firestore();
+
+// ═══════════════════════════════════════════════════════════
+// STORAGE — localStorage (cache) + Firestore (cloud)
+// ═══════════════════════════════════════════════════════════
+const _ls  = (k,v)  => { try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} };
+const _lg  = (k,fb) => { try{ const r=localStorage.getItem(k); return r!==null?JSON.parse(r):fb; }catch{ return fb; } };
+const _lsb = (bid,k,fb) => _lg(`b:${bid}:${k}`,fb);
+
+// Write queue — batches rapid edits, flushes to Firestore after 1.5s idle
+let _onSynced=null;
+// Per-key debounce timers so each field has its own 2s debounce
+const _fieldTimers={};
+
+// queueWrite — ALWAYS writes to localStorage immediately.
+// Firestore write is debounced per field (2s).
+// immediate=true bypasses debounce (for button-triggered saves).
+const queueWrite=(bid,key,val,immediate=false)=>{
+  // 1. localStorage — unconditional, always
+  try{ localStorage.setItem(`b:${bid}:${key}`,JSON.stringify(val)); }catch(e){}
+  // 2. Firestore — only if logged in
+  const uid=fbAuth.currentUser?.uid; if(!uid||!bid) return;
+  const tk=`${bid}:${key}`;
+  clearTimeout(_fieldTimers[tk]);
+  const doWrite=async()=>{
+    try{
+      await fbDb.collection('users').doc(uid).collection('books').doc(bid)
+        .set({[key]:val,_ts:Date.now()},{merge:true});
+      if(_onSynced) _onSynced(new Date().toISOString());
+    }catch(e){ console.warn(`Firestore write failed (${key}):`,e.message); }
+  };
+  if(immediate) doWrite();
+  else _fieldTimers[tk]=setTimeout(doWrite,2000);
+};
+
+// Flush all pending debounced writes immediately (used on beforeunload)
+const flushNow=()=>{ Object.keys(_fieldTimers).forEach(k=>clearTimeout(_fieldTimers[k])); };
+
+// Library
+const _saveLib=async(lib)=>{
+  _ls('library:books',lib);
+  const uid=fbAuth.currentUser?.uid; if(!uid) return;
+  try{ await fbDb.collection('users').doc(uid).set({library:lib,_ts:Date.now()},{merge:true}); }catch{}
+};
+const _loadLib=async()=>{
+  const uid=fbAuth.currentUser?.uid;
+  if(uid){ try{ const d=await fbDb.collection('users').doc(uid).get(); if(d.exists&&d.data().library){ const lib=d.data().library; _ls('library:books',lib); return lib; } }catch{} }
+  return _lg('library:books',[]);
+};
+
+// API key (stored in Firestore per-user so it syncs across devices)
+const _saveApiKey=async(key)=>{
+  localStorage.setItem('novelai:apikey',key);
+  const uid=fbAuth.currentUser?.uid; if(!uid) return;
+  try{ await fbDb.collection('users').doc(uid).set({anthropicKey:key},{merge:true}); }catch{}
+};
+const _loadApiKey=async()=>{
+  const uid=fbAuth.currentUser?.uid;
+  if(uid){ try{ const d=await fbDb.collection('users').doc(uid).get(); if(d.exists&&d.data().anthropicKey){ const k=d.data().anthropicKey; localStorage.setItem('novelai:apikey',k); return k; } }catch{} }
+  return localStorage.getItem('novelai:apikey')||null;
+};
+
+// Book data — cloud first, localStorage fallback
+const _loadBookCloud=async(bid)=>{
+  const uid=fbAuth.currentUser?.uid; if(!uid) return null;
+  try{
+    const d=await fbDb.collection('users').doc(uid).collection('books').doc(bid).get();
+    if(d.exists){ const data=d.data(); for(const [k,v] of Object.entries(data)) if(!k.startsWith('_')) try{localStorage.setItem(`b:${bid}:${k}`,JSON.stringify(v));}catch{}; return data; }
+  }catch{}
+  return null;
+};
+
+// Migrate localStorage data to Firestore on first login
+const _migrateLocal=async(uid)=>{
+  const lib=_lg('library:books',[]); if(!lib.length) return;
+  try{
+    const doc=await fbDb.collection('users').doc(uid).get();
+    if(doc.exists&&doc.data()._migrated) return;
+    await fbDb.collection('users').doc(uid).set({library:lib,_migrated:true,_ts:Date.now()},{merge:true});
+    const FIELDS=['idea','synopsis','outline','beats','prose','step','manuscript','characters','world','structure','escaleta','chapters','codex','lorebook','bsfavs','mapnodes','maplinks'];
+    for(const book of lib){
+      const d={};
+      for(const k of FIELDS){ const v=_lg(`b:${book.id}:${k}`,null); if(v!==null) d[k]=v; }
+      if(Object.keys(d).length) await fbDb.collection('users').doc(uid).collection('books').doc(book.id).set({...d,_migrated:true});
+    }
+    console.log('✓ Datos locales migrados a la nube');
+  }catch(e){ console.warn('Migración omitida:',e.message); }
+};
+
+// Debounce helper
+function debounce(fn, delay) {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(()=>fn(...args), delay); };
+}
+
+// ═══════════════════════════════════════════════════════════
+// GOOGLE DOCS SYNC
+// ─ Requiere: Google Docs API + Drive API habilitadas en tu
+//   proyecto Google Cloud, y el OAuth Client ID de tu app.
+// ─ Cómo obtener el Client ID:
+//   console.cloud.google.com → APIs y servicios → Credenciales
+//   → OAuth 2.0 → el "Web client" creado por Firebase
+//   → copiar el valor "ID de cliente" (termina en .apps.googleusercontent.com)
+// ═══════════════════════════════════════════════════════════
+const GDOCS_CLIENT_ID = "TU_OAUTH_CLIENT_ID.apps.googleusercontent.com"; // ← pega aquí tu Client ID
+const GDOCS_SCOPES = "https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file";
+
+let _gTokenClient = null;
+let _gAccessToken = null;
+let _gTokenExpiry  = 0;
+
+// Obtiene (o renueva) el access token con los permisos de Docs/Drive
+function _ensureGDocsToken() {
+  return new Promise((resolve, reject) => {
+    // Token válido — no hace falta nuevo popup
+    if (_gAccessToken && Date.now() < _gTokenExpiry - 60000) { resolve(_gAccessToken); return; }
+    if (!window.google?.accounts?.oauth2) { reject(new Error("Google Identity Services no cargado aún. Espera un momento y vuelve a intentarlo.")); return; }
+    if (!_gTokenClient) {
+      _gTokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: GDOCS_CLIENT_ID,
+        scope: GDOCS_SCOPES,
+        callback: () => {},
+      });
+    }
+    _gTokenClient.callback = (resp) => {
+      if (resp.error) { reject(new Error("Error al obtener permisos de Google: " + resp.error)); return; }
+      _gAccessToken = resp.access_token;
+      _gTokenExpiry  = Date.now() + (resp.expires_in || 3600) * 1000;
+      resolve(_gAccessToken);
+    };
+    // prompt:'' usa cuenta ya logueada sin popup si el token es reciente
+    _gTokenClient.requestAccessToken({ prompt: _gAccessToken ? "" : "consent" });
+  });
+}
+
+// Crea un Google Doc nuevo y devuelve su documentId
+async function _gDocsCreate(title) {
+  const token = await _ensureGDocsToken();
+  const res = await fetch("https://docs.googleapis.com/v1/documents", {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) throw new Error("No se pudo crear el documento: " + res.status);
+  const doc = await res.json();
+  return doc.documentId;
+}
+
+// Sobreescribe el contenido del Doc con el texto dado
+async function _gDocsWrite(docId, text) {
+  const token = await _ensureGDocsToken();
+  // 1. Obtener índice final actual
+  const getRes = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
+    headers: { "Authorization": "Bearer " + token },
+  });
+  if (!getRes.ok) throw new Error("No se pudo leer el documento: " + getRes.status);
+  const doc = await getRes.json();
+  const content = doc.body?.content || [];
+  const lastEl = content[content.length - 1];
+  const endIndex = lastEl ? (lastEl.endIndex - 1) : 1;
+  // 2. Borrar contenido actual e insertar nuevo
+  const requests = [];
+  if (endIndex > 1) requests.push({ deleteContentRange: { range: { startIndex: 1, endIndex } } });
+  if (text) requests.push({ insertText: { location: { index: 1 }, text } });
+  if (!requests.length) return;
+  const batchRes = await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ requests }),
+  });
+  if (!batchRes.ok) throw new Error("Error al escribir en el documento: " + batchRes.status);
+}
+
+// Lee el texto plano de un Google Doc
+async function _gDocsRead(docId) {
+  const token = await _ensureGDocsToken();
+  const res = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
+    headers: { "Authorization": "Bearer " + token },
+  });
+  if (!res.ok) throw new Error("No se pudo leer el documento: " + res.status);
+  const doc = await res.json();
+  let text = "";
+  for (const el of (doc.body?.content || [])) {
+    if (el.paragraph) {
+      for (const pe of (el.paragraph.elements || [])) {
+        if (pe.textRun?.content) text += pe.textRun.content;
+      }
+    }
+  }
+  return text.trimEnd();
+}
+
+// Guarda/actualiza linkedDocId en Firestore y localStorage para un libro
+async function _saveLinkedDocId(uid, bid, docId) {
+  try {
+    await fbDb.collection("users").doc(uid).collection("books").doc(bid)
+      .set({ linkedDocId: docId }, { merge: true });
+  } catch {}
+  try { localStorage.setItem(`b:${bid}:linkedDocId`, docId); } catch {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// HOOKS
+// ═══════════════════════════════════════════════════════════
+function useMobile() {
+  const [mob, setMob] = useState(()=>window.innerWidth<768);
+  useEffect(()=>{
+    const h=()=>setMob(window.innerWidth<768);
+    window.addEventListener('resize',h); return ()=>window.removeEventListener('resize',h);
+  },[]);
+  return mob;
+}
+
+// ═══════════════════════════════════════════════════════════
+// API
+// ═══════════════════════════════════════════════════════════
+async function callAI(messages,system="",max=1000,apiKey){
+  if(!apiKey) throw new Error("Sin API key. Ve a ⚙ Ajustes.");
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:max,...(system?{system}:{}),messages}),
+  });
+  const d=await res.json();
+  if(d.error) throw new Error(d.error.message);
+  return d.content?.map(b=>b.text||"").join("\n")||"";
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const BOOK_PALETTE=["#7c3aed","#2563eb","#dc2626","#059669","#d97706","#ec4899","#0891b2","#92400e","#065f46","#1d4ed8"];
+const randColor=()=>BOOK_PALETTE[Math.floor(Math.random()*BOOK_PALETTE.length)];
+const newBookId=()=>"book_"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+
+const C={
+  bg:"#f4f0e8",        // warm cream page
+  surface:"#ffffff",
+  border:"#e2ddd4",
+  borderL:"#ede9e0",
+  text:"#1c1a16",      // warm near-black
+  mid:"#6b6358",       // warm gray
+  light:"#a09890",     // muted warm
+  accent:"#c0562a",    // terracotta / warm coral (like the asterisk)
+  aLight:"#fdf0ea",
+  aMid:"#d4694f",
+  aSoft:"#fef6f2",
+  green:"#2d7a4f",
+  red:"#c0392b",
+  yellow:"#c47e1a",
+  blue:"#2563a8",
+};
+const sh="0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)";
+const shM="0 4px 20px rgba(0,0,0,0.08),0 2px 6px rgba(0,0,0,0.04)";
+const card={background:C.surface,border:`1px solid ${C.border}`,borderRadius:14,padding:24,boxShadow:sh};
+const fIn={width:"100%",background:C.surface,border:`1.5px solid ${C.border}`,borderRadius:10,padding:"11px 16px",color:C.text,fontSize:14,fontFamily:"Georgia,serif",boxSizing:"border-box",outline:"none"};
+const fLb={display:"block",color:C.mid,fontSize:11,fontFamily:"Georgia,serif",marginBottom:6,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"};
+const primBtn=d=>({display:"inline-flex",alignItems:"center",gap:8,padding:"11px 22px",borderRadius:10,border:"none",background:d?"#e8e2d8":C.accent,color:d?"#a09890":"#fff",cursor:d?"not-allowed":"pointer",fontSize:14,fontWeight:600,fontFamily:"Georgia,serif",boxShadow:d?"none":"0 2px 8px rgba(192,86,42,0.25)",transition:"all .15s"});
+const ghostBtn={display:"inline-flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:10,border:`1px solid ${C.border}`,background:C.surface,color:C.mid,cursor:"pointer",fontSize:13,fontFamily:"Georgia,serif",boxShadow:sh};
+const pill=(a,sm)=>({display:"inline-flex",alignItems:"center",gap:6,padding:sm?"5px 12px":"8px 18px",borderRadius:999,border:`1px solid ${a?C.accent:C.border}`,background:a?C.aLight:C.surface,color:a?C.accent:C.mid,cursor:"pointer",fontSize:sm?12:13,fontFamily:"Georgia,serif",fontWeight:a?600:400,whiteSpace:"nowrap"});
+
+const NODE_C={protagonist:C.green,antagonist:C.red,secondary:C.blue,mentor:C.yellow,other:C.light,lugar:"#0ea5e9",objeto:"#f97316",mitología:"#8b5cf6",otro:"#6b7280",lorebook:"#06b6d4",escena:"#d97706",structure:"#64748b",tema:C.accent,custom:"#374151"};
+const ROLE_LBL={protagonist:"Protagonista",antagonist:"Antagonista",secondary:"Secundario",mentor:"Mentor",other:"Otro"};
+
+const PUB_FORMATS=[
+  {id:"libro",icon:"📚",label:"Libro / Novela",color:"#7c3aed",desc:"Formato editorial estándar.",optList:["Revisar estilo literario","Separadores de capítulo","Normalizar diálogos"]},
+  {id:"cuento",icon:"🧒",label:"Cuento Infantil",color:"#f59e0b",desc:"Lenguaje sencillo, frases cortas.",optList:["Edad 3–6 años","Edad 7–10 años","Edad 11–14 años"]},
+  {id:"blog",icon:"🌐",label:"Web / Blog",color:"#3b82f6",desc:"Párrafos cortos, subtítulos.",optList:["Subtítulos H2/H3","Incluir CTA","Tono divulgativo"]},
+  {id:"wattpad",icon:"📖",label:"Wattpad",color:"#f97316",desc:"Cliffhangers, voz directa.",optList:["Nota de autor","Cliffhanger final","Resumen anterior"]},
+  {id:"substack",icon:"📧",label:"Substack",color:"#10b981",desc:"Primera persona, íntimo.",optList:["Saludo inicial","Reflexión final","Cierre con pregunta"]},
+  {id:"twitter",icon:"𝕏",label:"Hilo X / Twitter",color:"#1a1825",desc:"Tweets de máx. 280 caracteres.",optList:["Hilo de 10 tweets","Hilo de 15 tweets","Hilo de 20 tweets"]},
+  {id:"instagram",icon:"📸",label:"Instagram",color:"#ec4899",desc:"Visual, emojis, hashtags.",optList:["Tono emotivo","Tono misterioso","Hashtags literarios"]},
+  {id:"podcast",icon:"🎙️",label:"Guión Podcast",color:"#8b5cf6",desc:"Narración oral, pausas.",optList:["Intro y outro","Marcas [PAUSA]","Narración limpia"]},
+  {id:"guion",icon:"🎬",label:"Guión Cine",color:"#ef4444",desc:"INT./EXT., diálogos centrados.",optList:["Formato Hollywood","Notas dirección","Solo escenas principales"]},
+  {id:"medium",icon:"🗞️",label:"Medium",color:"#0ea5e9",desc:"Ensayo narrativo reflexivo.",optList:["Tono filosófico","Citas literarias","Estructura ensayo"]},
+  {id:"serial",icon:"📰",label:"Serial Episódico",color:"#64748b",desc:"800–1200 palabras por entrega.",optList:["5 entregas","10 entregas","Resumen anterior"]},
+  {id:"audiolibro",icon:"🎧",label:"Audiolibro",color:"#d97706",desc:"Prosa para escucha.",optList:["Notas entonación","Simplificar visuales","Marcar pausas"]},
+];
+
+const NAV=[
+  {group:"ESCRITURA",   items:[{id:"engine",icon:"⚡",label:"Story Engine"},{id:"manuscript",icon:"✍",label:"Manuscrito"}]},
+  {group:"PLANIFICACIÓN",items:[{id:"planning",icon:"⊞",label:"Tablero"},{id:"escaleta",icon:"≡",label:"Escaleta"},{id:"structure",icon:"◇",label:"Estructura"},{id:"arcos",icon:"◐",label:"Arcos"}]},
+  {group:"UNIVERSO",    items:[{id:"characters",icon:"◉",label:"Personajes"},{id:"world",icon:"○",label:"Mundo"},{id:"voice",icon:"◈",label:"Voz & Técnica"}]},
+  {group:"HERRAMIENTAS",items:[{id:"brainstorm",icon:"✦",label:"Brainstorm"},{id:"mapa",icon:"⬡",label:"Mapa"},{id:"importar",icon:"📥",label:"Importar"},{id:"publicar",icon:"🖨",label:"Publicar"},{id:"codex",icon:"□",label:"Codex"},{id:"lorebook",icon:"⌘",label:"Lorebook"}]},
+];
+
+const TOOLS_MS=[
+  {id:"descriptivo",label:"🎨 Descriptivo",group:"estilo"},{id:"intenso",label:"🔥 Intenso",group:"estilo"},
+  {id:"corto",label:"✂ Corto",group:"estilo"},{id:"pov",label:"↕ Cambiar POV",group:"estilo"},
+  {id:"cliffhanger",label:"🪝 Cliffhanger",group:"drama"},{id:"giro",label:"🌀 Giro",group:"drama"},
+  {id:"tension",label:"⚡ Tensión",group:"drama"},{id:"dialogo",label:"💬 Diálogo",group:"drama"},
+  {id:"flashback",label:"⏮ Flashback",group:"narrative"},{id:"foreshadow",label:"🔮 Presagio",group:"narrative"},
+  {id:"metafora",label:"🌿 Metáfora",group:"narrative"},{id:"ritmo",label:"🥁 Ritmo",group:"narrative"},
+];
+
+const EC={name:"",role:"protagonist",appearance:"",fears:"",secret:"",ghost:"",arcStart:"",arcEnd:"",arcHow:""};
+const EW={genre:"",magicRules:"",geography:"",society:"",tone:""};
+const ES={premise:"",theme:"",pov:"thirdClose",incitingIncident:"",midpointTwist:"",darkNight:"",climax:"",plotTwists:""};
+const EE={title:"",summary:"",goal:"",conflict:"",hook:""};
+
+// ═══════════════════════════════════════════════════════════
+// SAVE INDICATOR COMPONENT
+// ═══════════════════════════════════════════════════════════
+function SaveIndicator({ savedAt, isMobile }) {
+  const [show, setShow] = useState(false);
+  const prev = useRef(null);
+
+  useEffect(()=>{
+    if(savedAt && savedAt !== prev.current) {
+      prev.current = savedAt;
+      setShow(true);
+      const t = setTimeout(()=>setShow(false), 3000);
+      return ()=>clearTimeout(t);
+    }
+  },[savedAt]);
+
+  if(!savedAt) return null;
+
+  const timeStr = (() => {
+    const d = new Date(savedAt);
+    return d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  })();
+
+  return (
+    <div style={{
+      position:'fixed', bottom: isMobile ? 72 : 16, right: 16,
+      background: show ? C.green : 'rgba(16,185,129,0.12)',
+      border: `1px solid ${show ? C.green : 'rgba(16,185,129,0.25)'}`,
+      color: show ? '#fff' : C.green,
+      borderRadius: 999, padding:'6px 14px',
+      fontSize:11, fontFamily:'Georgia,serif', fontWeight:600,
+      display:'flex', alignItems:'center', gap:6,
+      transition:'all .4s ease', zIndex:500,
+      boxShadow: show ? '0 4px 12px rgba(16,185,129,0.35)' : 'none',
+      animation: show ? 'savePop .3s ease' : 'none',
+    }}>
+      <span>{show ? '💾' : '✓'}</span>
+      <span>{show ? 'Guardado' : timeStr}</span>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOGIN SCREEN
+// ═══════════════════════════════════════════════════════════
+function LoginScreen() {
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const signIn = async () => {
+    setLoading(true); setErr('');
+    try { await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+    catch(e) { setErr(e.code==='auth/popup-closed-by-user'?'Popup cerrado. Inténtalo de nuevo.':e.message); setLoading(false); }
+  };
+  return (
+    <div style={{width:'100vw',height:'100vh',background:'#0c0a14',display:'flex',alignItems:'center',justifyContent:'center',padding:20,overflowY:'auto'}}>
+      {[...Array(25)].map((_,i)=><div key={i} style={{position:'fixed',borderRadius:'50%',width:i%5===0?2:1,height:i%5===0?2:1,background:'rgba(255,255,255,.5)',top:`${(i*7+3)%90}%`,left:`${(i*11+5)%100}%`,opacity:.3+(i%4)*.15,animation:`lampFlicker ${3+i%4}s infinite`,animationDelay:`${i*.3}s`}}/>)}
+      <div style={{background:'rgba(22,18,36,.96)',border:'1px solid rgba(124,58,237,.3)',borderRadius:24,padding:'44px 32px',maxWidth:420,width:'100%',boxShadow:'0 24px 80px rgba(0,0,0,.8)',position:'relative',zIndex:1,textAlign:'center'}}>
+        <div style={{fontSize:38,fontFamily:"'Palatino Linotype',Georgia,serif",color:'#fdf6e3',letterSpacing:'0.08em',marginBottom:4}}>Novel<span style={{color:'#a78bfa'}}>AI</span></div>
+        <div style={{fontSize:10,color:'rgba(167,139,250,.5)',letterSpacing:'0.4em',textTransform:'uppercase',fontFamily:'Georgia,serif',marginBottom:28}}>Studio</div>
+        <div style={{width:60,height:1,background:'linear-gradient(90deg,transparent,rgba(167,139,250,.4),transparent)',margin:'0 auto 28px'}}/>
+        <p style={{color:'rgba(255,240,210,.75)',fontFamily:'Georgia,serif',fontSize:15,lineHeight:1.75,marginBottom:32}}>
+          Tu escritorio de escritura,<br/><strong style={{color:'#a78bfa'}}>sincronizado en todos tus dispositivos</strong>.<br/>
+          <span style={{fontSize:13,color:'rgba(200,180,255,.5)'}}>Escribe en el móvil, continúa en el ordenador.</span>
+        </p>
+        <button onClick={signIn} disabled={loading} style={{width:'100%',padding:'14px 24px',borderRadius:12,border:'1px solid rgba(200,180,255,.2)',background:'rgba(255,255,255,.06)',color:'#fdf6e3',cursor:loading?'not-allowed':'pointer',fontSize:15,fontFamily:'Georgia,serif',fontWeight:500,display:'flex',alignItems:'center',justifyContent:'center',gap:12,opacity:loading?.7:1}}>
+          {loading?<span style={{width:20,height:20,border:'2px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',display:'inline-block',animation:'spin .8s linear infinite'}}/>:<svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>}
+          {loading?'Conectando...':'Continuar con Google'}
+        </button>
+        {err&&<div style={{color:'#f87171',fontSize:12,fontFamily:'Georgia,serif',marginTop:14,padding:'10px 14px',background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.2)',borderRadius:10}}>{err}</div>}
+        <p style={{color:'rgba(200,180,255,.25)',fontFamily:'Georgia,serif',fontSize:11,marginTop:22,lineHeight:1.6}}>🔒 Solo usamos tu cuenta Google para identificarte.<br/>Tus escritos viven en tu espacio privado de nube.</p>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// SYNC BADGE
+// ═══════════════════════════════════════════════════════════
+function SyncBadge({status,savedAt,isMobile}){
+  const [flash,setFlash]=useState(false); const prev=useRef(null);
+  useEffect(()=>{ if(savedAt&&savedAt!==prev.current){ prev.current=savedAt; setFlash(true); const t=setTimeout(()=>setFlash(false),2500); return()=>clearTimeout(t); } },[savedAt]);
+  const cfg={synced:{icon:'☁',label:'Guardado en nube',c:C.green},syncing:{icon:'⟳',label:'Guardando...',c:C.yellow},offline:{icon:'◌',label:'Sin conexión',c:C.light}}[status]||{icon:'◌',label:'',c:C.light};
+  return(<div style={{position:'fixed',bottom:isMobile?70:14,right:14,background:flash?cfg.c:'rgba(255,255,255,.9)',border:`1px solid ${flash?cfg.c:'rgba(0,0,0,.1)'}`,color:flash?'#fff':cfg.c,borderRadius:999,padding:'5px 12px',fontSize:11,fontFamily:'Georgia,serif',fontWeight:600,display:'flex',alignItems:'center',gap:5,transition:'all .4s ease',zIndex:500,backdropFilter:'blur(8px)'}}>
+    <span style={{animation:status==='syncing'?'spin .8s linear infinite':undefined,display:'inline-block'}}>{cfg.icon}</span>
+    <span>{flash?cfg.label:(savedAt?new Date(savedAt).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):cfg.label)}</span>
+  </div>);
+}
+
+// ═══════════════════════════════════════════════════════════
+// API KEY SETUP
+// ═══════════════════════════════════════════════════════════
+function ApiKeySetup({onSave}){
+  const [key,setKey]=useState("");const [show,setShow]=useState(false);
+  const [testing,setTesting]=useState(false);const [err,setErr]=useState("");
+  const test=async()=>{
+    if(!key.trim())return; setTesting(true); setErr("");
+    try{ await callAI([{role:"user",content:"Di: OK"}],"",10,key.trim()); onSave(key.trim()); }
+    catch(e){ setErr(e.message||"API key inválida."); }
+    setTesting(false);
+  };
+  return(
+    <div style={{width:"100vw",height:"100vh",background:"#0c0a14",display:"flex",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto"}}>
+      {[...Array(25)].map((_,i)=>(
+        <div key={i} style={{position:"fixed",borderRadius:"50%",width:i%5===0?2:1,height:i%5===0?2:1,background:"rgba(255,255,255,0.5)",top:`${(i*7+3)%90}%`,left:`${(i*11+5)%100}%`,opacity:.3+(i%4)*.15,animation:`lampFlicker ${3+i%4}s infinite`,animationDelay:`${i*.3}s`}}/>
+      ))}
+      <div style={{background:"rgba(22,18,36,0.96)",border:"1px solid rgba(124,58,237,0.3)",borderRadius:20,padding:"36px 28px",maxWidth:440,width:"100%",boxShadow:"0 24px 80px rgba(0,0,0,0.8)",position:"relative",zIndex:1,textAlign:"center"}}>
+        <div style={{fontSize:32,fontFamily:"'Palatino Linotype',Georgia,serif",color:"#fdf6e3",letterSpacing:"0.08em",marginBottom:4}}>Novel<span style={{color:"#a78bfa"}}>AI</span></div>
+        <div style={{fontSize:10,color:"rgba(167,139,250,0.5)",letterSpacing:"0.4em",textTransform:"uppercase",fontFamily:"Georgia,serif",marginBottom:24}}>Studio</div>
+        <p style={{color:"rgba(255,240,210,0.75)",fontFamily:"Georgia,serif",fontSize:14,lineHeight:1.7,marginBottom:24}}>
+          Necesitas una <strong style={{color:"#a78bfa"}}>API Key de Anthropic</strong>.<br/>
+          Obtenla en <a href="https://console.anthropic.com" target="_blank" style={{color:"#a78bfa"}}>console.anthropic.com</a>
+        </p>
+        <label style={{...fLb,color:"rgba(200,180,255,0.6)",textAlign:"left",display:"block",marginBottom:6}}>Tu API Key</label>
+        <div style={{position:"relative",marginBottom:16}}>
+          <input type={show?"text":"password"} value={key} onChange={e=>setKey(e.target.value)} onKeyDown={e=>e.key==="Enter"&&test()} placeholder="sk-ant-api03-..."
+            style={{...fIn,background:"rgba(255,255,255,0.06)",border:"1.5px solid rgba(124,58,237,0.3)",color:"#fdf6e3",paddingRight:48,fontFamily:"monospace",fontSize:13,borderRadius:12}}
+            onFocus={e=>e.target.style.borderColor="rgba(124,58,237,0.8)"} onBlur={e=>e.target.style.borderColor="rgba(124,58,237,0.3)"}/>
+          <button onClick={()=>setShow(s=>!s)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"rgba(200,180,255,0.5)",cursor:"pointer",fontSize:16,padding:4}}>{show?"🙈":"👁"}</button>
+        </div>
+        {err&&<div style={{color:"#f87171",fontSize:12,fontFamily:"Georgia,serif",marginBottom:14,padding:"10px 14px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:10}}>{err}</div>}
+        <button onClick={test} disabled={testing||!key.trim()} style={{...primBtn(testing||!key.trim()),width:"100%",justifyContent:"center"}}>
+          {testing?"⏳ Verificando...":"✦ Guardar y comenzar"}
+        </button>
+        <p style={{color:"rgba(200,180,255,0.3)",fontFamily:"Georgia,serif",fontSize:11,marginTop:16,lineHeight:1.6}}>
+          🔒 Tu clave se guarda solo en este dispositivo.<br/>Nunca pasa por ningún servidor externo.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// SETTINGS MODAL
+// ═══════════════════════════════════════════════════════════
+function SettingsModal({user,currentKey,onSave,onClose}){
+  const [newKey,setNewKey]=useState(""); const [show,setShow]=useState(false);
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(12,10,20,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,backdropFilter:"blur(8px)",padding:20}} className="modal-wrap">
+      <div style={{background:"#1a1528",border:"1px solid rgba(124,58,237,0.25)",borderRadius:20,width:"100%",maxWidth:420,boxShadow:"0 24px 80px rgba(0,0,0,0.8)"}} className="modal-box">
+        <div style={{padding:"20px 24px 16px",borderBottom:"1px solid rgba(124,58,237,0.15)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <h3 style={{margin:0,fontSize:17,fontFamily:"Georgia,serif",color:"#fdf6e3",fontWeight:400}}>⚙ Ajustes</h3>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(200,180,255,0.4)",cursor:"pointer",fontSize:20,padding:4}}>✕</button>
+        </div>
+        <div style={{padding:24}}>
+          {/* User info */}
+          {user&&<div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20,padding:"10px 14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(124,58,237,0.15)",borderRadius:12}}>
+            {user.photoURL?<img src={user.photoURL} style={{width:36,height:36,borderRadius:"50%"}} alt=""/>:<div style={{width:36,height:36,borderRadius:"50%",background:"#7c3aed",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:16,flexShrink:0}}>{user.displayName?.[0]||"U"}</div>}
+            <div style={{flex:1,overflow:"hidden"}}>
+              <div style={{fontSize:14,color:"#fdf6e3",fontFamily:"Georgia,serif",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.displayName}</div>
+              <div style={{fontSize:11,color:"rgba(200,180,255,0.4)",fontFamily:"Georgia,serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.email}</div>
+            </div>
+          </div>}
+          {/* Current key */}
+          <div style={{padding:"10px 14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(124,58,237,0.2)",borderRadius:10,color:"rgba(200,180,255,0.4)",fontFamily:"monospace",fontSize:12,marginBottom:18}}>
+            {currentKey?currentKey.slice(0,16)+"••••••••":"Sin clave configurada"}
+          </div>
+          <label style={{...fLb,color:"rgba(200,180,255,0.6)"}}>Nueva API Key de Anthropic</label>
+          <div style={{position:"relative",marginBottom:16}}>
+            <input type={show?"text":"password"} value={newKey} onChange={e=>setNewKey(e.target.value)} placeholder="sk-ant-api03-..."
+              style={{...fIn,background:"rgba(255,255,255,0.05)",border:"1.5px solid rgba(124,58,237,0.25)",color:"#fdf6e3",paddingRight:44,fontFamily:"monospace",fontSize:13}}
+              onFocus={e=>e.target.style.borderColor="rgba(124,58,237,0.7)"} onBlur={e=>e.target.style.borderColor="rgba(124,58,237,0.25)"}/>
+            <button onClick={()=>setShow(s=>!s)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"rgba(200,180,255,0.4)",cursor:"pointer",fontSize:14,padding:4}}>{show?"🙈":"👁"}</button>
+          </div>
+          <div style={{display:"flex",gap:10,marginBottom:20}}>
+            <button onClick={onClose} style={{...ghostBtn,flex:1,justifyContent:"center"}}>Cancelar</button>
+            <button onClick={()=>newKey.trim()&&onSave(newKey.trim())} disabled={!newKey.trim()} style={{...primBtn(!newKey.trim()),flex:1,justifyContent:"center",padding:"10px 0"}}>Guardar clave</button>
+          </div>
+          {/* Sign out */}
+          <button onClick={()=>{if(confirm("¿Cerrar sesión?")){ fbAuth.signOut(); onClose(); }}} style={{width:"100%",padding:"9px 0",borderRadius:10,border:"1px solid rgba(200,180,255,0.15)",background:"transparent",color:"rgba(200,180,255,0.4)",cursor:"pointer",fontSize:12,fontFamily:"Georgia,serif",marginBottom:12}}>
+            Cerrar sesión de Google
+          </button>
+          {/* Cache clear */}
+          <div style={{padding:"12px 14px",background:"rgba(239,68,68,0.05)",border:"1px solid rgba(239,68,68,0.15)",borderRadius:10}}>
+            <div style={{fontSize:11,color:"rgba(200,180,255,0.35)",fontFamily:"Georgia,serif",marginBottom:8}}>⚠ Solo borra el caché local (tus datos en nube se conservan):</div>
+            <button onClick={()=>{if(confirm("¿Limpiar caché local?")){localStorage.clear();location.reload();}}} style={{padding:"6px 14px",borderRadius:8,border:"1px solid rgba(239,68,68,0.3)",background:"transparent",color:"#f87171",cursor:"pointer",fontSize:12,fontFamily:"Georgia,serif"}}>Limpiar caché</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// DESK SCENE
+// ═══════════════════════════════════════════════════════════
+function DeskScene({library,user,onNewBook,onConnectedBook,onOpenLibrary,onOpenRecent,onSettings}){
+  const isMobile=useMobile();
+  const recent=[...library].sort((a,b)=>new Date(b.lastEdited||0)-new Date(a.lastEdited||0))[0];
+  const BG="#f4f0e8";
+  const actions=[
+    {id:"new",icon:null,label:"Nueva obra",sub:"Empieza desde cero",color:"#c0562a",fn:onNewBook,
+      illustration:(<svg width="80" height="56" viewBox="0 0 80 56" fill="none">
+        <rect x="20" y="8" width="40" height="40" rx="4" fill="#e8e2d8" stroke="#c8c0b4" strokeWidth="1"/>
+        <rect x="24" y="16" width="32" height="2" rx="1" fill="#c0b8ac"/>
+        <rect x="24" y="22" width="28" height="2" rx="1" fill="#c0b8ac"/>
+        <rect x="24" y="28" width="24" height="2" rx="1" fill="#c0b8ac"/>
+        <rect x="24" y="12" width="1" height="30" rx="0.5" fill="#d4cdc4"/>
+        <circle cx="56" cy="38" r="10" fill="#fff" stroke="#e2ddd4" strokeWidth="1.5"/>
+        <line x1="56" y1="33" x2="56" y2="43" stroke="#c0562a" strokeWidth="1.5" strokeLinecap="round"/>
+        <line x1="51" y1="38" x2="61" y2="38" stroke="#c0562a" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>)},
+    {id:"saga",icon:null,label:"Nueva saga",sub:"Varios libros conectados",color:"#2563a8",fn:onConnectedBook,
+      illustration:(<svg width="80" height="56" viewBox="0 0 80 56" fill="none">
+        <rect x="10" y="12" width="22" height="32" rx="3" fill="#dde8f5" stroke="#b8cee8" strokeWidth="1"/>
+        <rect x="29" y="10" width="22" height="34" rx="3" fill="#c8daf0" stroke="#96b8e0" strokeWidth="1"/>
+        <rect x="48" y="12" width="22" height="32" rx="3" fill="#dde8f5" stroke="#b8cee8" strokeWidth="1"/>
+        <line x1="32" y1="28" x2="28" y2="28" stroke="#2563a8" strokeWidth="1" strokeDasharray="2 2"/>
+        <line x1="51" y1="28" x2="47" y2="28" stroke="#2563a8" strokeWidth="1" strokeDasharray="2 2"/>
+        <rect x="33" y="16" width="14" height="2" rx="1" fill="#96b8e0"/>
+        <rect x="33" y="21" width="10" height="2" rx="1" fill="#96b8e0"/>
+      </svg>)},
+    {id:"library",icon:null,label:"Mis libros",sub:`${library.length} guardado${library.length!==1?"s":""}`,color:"#2d7a4f",fn:onOpenLibrary,badge:library.length||null,
+      illustration:(<svg width="80" height="56" viewBox="0 0 80 56" fill="none">
+        <rect x="8" y="10" width="10" height="36" rx="2" fill="#d4e8dc" stroke="#a8ccb4" strokeWidth="1"/>
+        <rect x="20" y="14" width="12" height="32" rx="2" fill="#c0dcca" stroke="#90c0a4" strokeWidth="1"/>
+        <rect x="34" y="10" width="8" height="36" rx="2" fill="#d4e8dc" stroke="#a8ccb4" strokeWidth="1"/>
+        <rect x="44" y="16" width="14" height="30" rx="2" fill="#b8d8c4" stroke="#80b494" strokeWidth="1"/>
+        <rect x="60" y="12" width="10" height="34" rx="2" fill="#c8e0d0" stroke="#98c8a8" strokeWidth="1"/>
+        <line x1="6" y1="47" x2="72" y2="47" stroke="#a8ccb4" strokeWidth="1"/>
+      </svg>)},
+    ...(recent?[{id:"recent",icon:null,label:"Continuar",sub:recent.title.length>22?recent.title.slice(0,21)+"…":recent.title,color:recent.color||"#c47e1a",fn:()=>onOpenRecent(),
+      illustration:(<svg width="80" height="56" viewBox="0 0 80 56" fill="none">
+        <rect x="15" y="6" width="50" height="44" rx="4" fill="#fdf6e8" stroke="#e2ddd4" strokeWidth="1"/>
+        <rect x="19" y="13" width="42" height="2" rx="1" fill="#d4cdc4"/>
+        <rect x="19" y="19" width="38" height="2" rx="1" fill="#d4cdc4"/>
+        <rect x="19" y="25" width="40" height="2" rx="1" fill="#d4cdc4"/>
+        <rect x="19" y="31" width="30" height="2" rx="1" fill="#d4cdc4"/>
+        <rect x="19" y="37" width="18" height="2" rx="1" fill="#c0562a" opacity=".5"/>
+        <circle cx="57" cy="40" r="8" fill={recent.color||"#c47e1a"} opacity=".15" stroke={recent.color||"#c47e1a"} strokeWidth="1"/>
+        <path d="M54 40l2 2 4-4" stroke={recent.color||"#c47e1a"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>)}]:[{id:"start",icon:null,label:"Empezar",sub:"Crea tu primera obra",color:"#c0562a",fn:onNewBook,
+      illustration:(<svg width="80" height="56" viewBox="0 0 80 56" fill="none">
+        <circle cx="40" cy="28" r="18" fill="#fdf0ea" stroke="#e8c4b4" strokeWidth="1"/>
+        <line x1="40" y1="18" x2="40" y2="38" stroke="#c0562a" strokeWidth="2" strokeLinecap="round"/>
+        <line x1="30" y1="28" x2="50" y2="28" stroke="#c0562a" strokeWidth="2" strokeLinecap="round"/>
+      </svg>)}]),
+    {id:"brainstorm",icon:null,label:"Brainstorm",sub:"Generar ideas",color:"#8b5e3c",fn:()=>onOpenRecent(null,"brainstorm"),
+      illustration:(<svg width="80" height="56" viewBox="0 0 80 56" fill="none">
+        <circle cx="40" cy="22" r="14" fill="#f5ece4" stroke="#d4b89c" strokeWidth="1"/>
+        <path d="M35 22 Q40 14 45 22 Q47 28 40 30 Q33 28 35 22Z" fill="#d4a880" opacity=".6"/>
+        <line x1="40" y1="30" x2="40" y2="36" stroke="#d4a880" strokeWidth="2" strokeLinecap="round"/>
+        <rect x="36" y="36" width="8" height="2" rx="1" fill="#d4a880"/>
+        <rect x="37" y="39" width="6" height="2" rx="1" fill="#d4a880"/>
+        <circle cx="33" cy="18" r="1.5" fill="#c0562a"/>
+        <circle cx="47" cy="18" r="1.5" fill="#c0562a"/>
+        <path d="M36 23 Q40 26 44 23" stroke="#c0562a" strokeWidth="1" fill="none" strokeLinecap="round"/>
+      </svg>)},
+    {id:"manuscript",icon:null,label:"Manuscrito",sub:"Editor de texto",color:"#4a5568",fn:()=>onOpenRecent(null,"manuscript"),
+      illustration:(<svg width="80" height="56" viewBox="0 0 80 56" fill="none">
+        <rect x="16" y="8" width="48" height="40" rx="4" fill="#f8f5f0" stroke="#e2ddd4" strokeWidth="1"/>
+        <rect x="22" y="16" width="36" height="2" rx="1" fill="#c8c0b4"/>
+        <rect x="22" y="22" width="32" height="2" rx="1" fill="#c8c0b4"/>
+        <rect x="22" y="28" width="36" height="2" rx="1" fill="#c8c0b4"/>
+        <rect x="22" y="34" width="20" height="2" rx="1" fill="#c8c0b4"/>
+        <rect x="43" y="34" width="1.5" height="9" rx="0.75" fill="#c0562a" style={{animation:"cursorBlink 1.2s infinite"}}/>
+      </svg>)},
+  ];
+
+  return(
+    <div style={{width:"100vw",minHeight:"100vh",background:BG,overflowY:"auto",overflowX:"hidden"}}>
+      <div style={{maxWidth:960,margin:"0 auto",padding:isMobile?"32px 20px 60px":"60px 48px 80px"}}>
+
+        {/* Top bar */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:isMobile?36:52}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            {/* Logo asterisk */}
+            <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+              <line x1="16" y1="2" x2="16" y2="30" stroke="#c0562a" strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="2" y1="16" x2="30" y2="16" stroke="#c0562a" strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="5" y1="5" x2="27" y2="27" stroke="#c0562a" strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="27" y1="5" x2="5" y2="27" stroke="#c0562a" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+            <span style={{fontSize:18,fontFamily:"'Palatino Linotype',Georgia,serif",color:C.text,fontWeight:400,letterSpacing:"-0.01em"}}>NovelAI <span style={{color:C.accent}}>Studio</span></span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            {user&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"5px 12px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:999}}>
+              {user.photoURL?<img src={user.photoURL} style={{width:22,height:22,borderRadius:"50%"}} alt=""/>:<div style={{width:22,height:22,borderRadius:"50%",background:C.accent,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,flexShrink:0}}>{user.displayName?.[0]||"U"}</div>}
+              <span style={{fontSize:12,color:C.mid,fontFamily:"Georgia,serif"}}>{user.displayName?.split(" ")[0]}</span>
+            </div>}
+            <button onClick={onSettings} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:999,padding:"6px 12px",color:C.mid,cursor:"pointer",fontSize:13,fontFamily:"Georgia,serif",boxShadow:sh}}>⚙</button>
+          </div>
+        </div>
+
+        {/* Hero text */}
+        <div style={{marginBottom:isMobile?40:56}}>
+          <h1 style={{margin:"0 0 14px",fontSize:isMobile?30:46,fontFamily:"'Palatino Linotype',Georgia,serif",color:C.text,fontWeight:400,lineHeight:1.15,letterSpacing:"-0.02em"}}>
+            {user?`Bienvenido, ${user.displayName?.split(" ")[0] || "escritor"}!`:"NovelAI Studio"}
+          </h1>
+          <p style={{margin:0,fontSize:isMobile?15:18,color:C.mid,fontFamily:"Georgia,serif",lineHeight:1.7,maxWidth:520}}>
+            Tu escritorio de escritura asistida por IA.<br/>
+            ¿Por dónde quieres empezar hoy?
+          </p>
+        </div>
+
+        {/* Action card grid */}
+        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(3,1fr)",gap:16}}>
+          {actions.map(item=>(
+            <button key={item.id} onClick={item.fn}
+              onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-3px)"; e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,0.10)"; }}
+              onMouseLeave={e=>{ e.currentTarget.style.transform="none"; e.currentTarget.style.boxShadow=sh; }}
+              onTouchStart={e=>e.currentTarget.style.opacity=".85"}
+              onTouchEnd={e=>e.currentTarget.style.opacity="1"}
+              style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:14,padding:"20px 20px 16px",cursor:"pointer",textAlign:"left",boxShadow:sh,transition:"transform .18s ease, box-shadow .18s ease",position:"relative",WebkitTapHighlightColor:"transparent",display:"flex",flexDirection:"column",gap:0}}>
+              {item.badge&&<div style={{position:"absolute",top:14,right:14,width:20,height:20,borderRadius:999,background:item.color,color:"#fff",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Georgia,serif"}}>{item.badge}</div>}
+              {/* Illustration area */}
+              <div style={{background:"#f4f0e8",borderRadius:10,marginBottom:16,height:80,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+                {item.illustration}
+              </div>
+              <div style={{fontSize:isMobile?13:14,fontFamily:"Georgia,serif",color:C.text,fontWeight:600,marginBottom:3,lineHeight:1.3}}>{item.label}</div>
+              <div style={{fontSize:12,color:C.light,fontFamily:"Georgia,serif",lineHeight:1.4}}>{item.sub}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{marginTop:48,display:"flex",alignItems:"center",gap:8,color:C.light,fontSize:12,fontFamily:"Georgia,serif"}}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <circle cx="6" cy="6" r="5" stroke={C.light} strokeWidth="1"/>
+            <path d="M4 6l1.5 1.5L8 4" stroke={C.light} strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Tus escritos se guardan automáticamente en la nube
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// LIBRARY PANEL
+// ═══════════════════════════════════════════════════════════
+function LibraryPanel({library,onOpen,onDelete,onClose}){
+  const isMobile=useMobile();
+  const [confirmDel,setConfirmDel]=useState(null);
+  const sorted=[...library].sort((a,b)=>new Date(b.lastEdited||0)-new Date(a.lastEdited||0));
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(12,10,20,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(8px)",padding:isMobile?0:24}} className="modal-wrap">
+      <div style={{background:"#1a1528",border:"1px solid rgba(124,58,237,0.25)",borderRadius:isMobile?"20px 20px 0 0":24,width:"100%",maxWidth:820,maxHeight:isMobile?"90vh":"88vh",overflow:"auto",boxShadow:"0 24px 80px rgba(0,0,0,0.8)",marginTop:"auto"}} className="modal-box">
+        <div style={{padding:"24px 24px 16px",borderBottom:"1px solid rgba(124,58,237,0.15)",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,background:"#1a1528",zIndex:1}}>
+          <div>
+            <h2 style={{margin:0,fontSize:22,fontFamily:"Georgia,serif",color:"#fdf6e3",fontWeight:400}}>Biblioteca</h2>
+            <p style={{margin:"4px 0 0",fontSize:12,color:"rgba(200,180,255,0.5)",fontFamily:"Georgia,serif"}}>{library.length} obra{library.length!==1?"s":""}</p>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(200,180,255,0.5)",cursor:"pointer",fontSize:22,padding:8}}>✕</button>
+        </div>
+        <div style={{padding:20}}>
+          {library.length===0?(
+            <div style={{textAlign:"center",padding:"48px 0",color:"rgba(200,180,255,0.35)",fontFamily:"Georgia,serif"}}>
+              <div style={{fontSize:40,marginBottom:12}}>📚</div><div>Tu biblioteca está vacía.</div>
+            </div>
+          ):(
+            <div style={{display:"grid",gridTemplateColumns:`repeat(auto-fill,minmax(${isMobile?140:175}px,1fr))`,gap:14}}>
+              {sorted.map(book=>(
+                <div key={book.id} style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(124,58,237,0.15)",borderRadius:14,padding:14,cursor:"pointer",position:"relative"}}
+                  onTouchStart={e=>e.currentTarget.style.opacity=".8"} onTouchEnd={e=>e.currentTarget.style.opacity="1"}>
+                  <div onClick={()=>onOpen(book)} style={{width:"100%",paddingTop:"130%",position:"relative",borderRadius:8,overflow:"hidden",marginBottom:10}}>
+                    <div style={{position:"absolute",inset:0,background:`linear-gradient(160deg,${book.color}cc,${book.color}88)`,display:"flex",flexDirection:"column",justifyContent:"flex-end",padding:"10px 8px"}}>
+                      <div style={{position:"absolute",inset:0,background:"repeating-linear-gradient(90deg,rgba(0,0,0,0.03),rgba(0,0,0,0.03) 1px,transparent 1px,transparent 8px)"}}/>
+                      <div style={{position:"absolute",top:0,bottom:0,right:0,width:5,background:"rgba(0,0,0,0.2)"}}/>
+                      <div style={{fontSize:11,fontFamily:"Georgia,serif",color:"rgba(255,255,255,0.9)",fontWeight:600,lineHeight:1.3,position:"relative",zIndex:1}}>{book.title}</div>
+                      {book.type==="saga"&&<div style={{fontSize:9,color:"rgba(255,255,255,0.5)",fontFamily:"Georgia,serif",position:"relative",zIndex:1}}>∞ {book.sagaName}</div>}
+                    </div>
+                  </div>
+                  <div onClick={()=>onOpen(book)}>
+                    <div style={{fontSize:12,fontFamily:"Georgia,serif",color:"#fdf6e3",fontWeight:600,marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{book.title}</div>
+                    <div style={{fontSize:10,color:"rgba(200,180,255,0.35)",fontFamily:"Georgia,serif"}}>{(book.wordCount||0).toLocaleString()}p · {book.lastEdited?new Date(book.lastEdited).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"—"}</div>
+                  </div>
+                  {confirmDel===book.id?(
+                    <div style={{marginTop:8,display:"flex",gap:5}}>
+                      <button onClick={()=>{onDelete(book.id);setConfirmDel(null);}} style={{flex:1,padding:"5px 0",borderRadius:8,border:"1px solid rgba(239,68,68,0.5)",background:"rgba(239,68,68,0.1)",color:"#ef4444",cursor:"pointer",fontSize:11,fontFamily:"Georgia,serif"}}>Borrar</button>
+                      <button onClick={()=>setConfirmDel(null)} style={{flex:1,padding:"5px 0",borderRadius:8,border:"1px solid rgba(200,180,255,0.15)",background:"transparent",color:"rgba(200,180,255,0.5)",cursor:"pointer",fontSize:11,fontFamily:"Georgia,serif"}}>No</button>
+                    </div>
+                  ):(
+                    <button onClick={e=>{e.stopPropagation();setConfirmDel(book.id);}} style={{position:"absolute",top:10,right:10,background:"rgba(0,0,0,0.3)",border:"none",borderRadius:999,width:22,height:22,color:"rgba(200,180,255,0.3)",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// NEW BOOK MODAL
+// ═══════════════════════════════════════════════════════════
+function NewBookModal({type,library,onConfirm,onClose}){
+  const isMobile=useMobile();
+  const [title,setTitle]=useState(""); const [color,setColor]=useState(randColor());
+  const [sagaName,setSagaName]=useState(""); const [sagaOrder,setSagaOrder]=useState(1);
+  const [connectedTo,setConnectedTo]=useState([]);
+  const isConnected=type==="connected";
+  const canSubmit=title.trim()&&(!isConnected||sagaName.trim());
+  const toggleConn=id=>setConnectedTo(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(12,10,20,0.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1001,backdropFilter:"blur(8px)",padding:isMobile?0:24}} className="modal-wrap">
+      <div style={{background:"#1a1528",border:"1px solid rgba(124,58,237,0.25)",borderRadius:isMobile?"20px 20px 0 0":20,width:"100%",maxWidth:480,maxHeight:isMobile?"92vh":"88vh",overflow:"auto",marginTop:"auto"}} className="modal-box">
+        <div style={{padding:"20px 24px 16px",borderBottom:"1px solid rgba(124,58,237,0.15)",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,background:"#1a1528",zIndex:1}}>
+          <h3 style={{margin:0,fontSize:18,fontFamily:"Georgia,serif",color:"#fdf6e3",fontWeight:400}}>{isConnected?"∞ Nueva Saga":"✦ Nueva Obra"}</h3>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(200,180,255,0.4)",cursor:"pointer",fontSize:20,padding:8}}>✕</button>
+        </div>
+        <div style={{padding:24}}>
+          <label style={{...fLb,color:"rgba(200,180,255,0.6)"}}>Título</label>
+          <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="El nombre de tu historia..."
+            style={{...fIn,background:"rgba(255,255,255,0.05)",border:"1.5px solid rgba(124,58,237,0.25)",color:"#fdf6e3",marginBottom:20,fontSize:16}}
+            onFocus={e=>e.target.style.borderColor="rgba(124,58,237,0.8)"} onBlur={e=>e.target.style.borderColor="rgba(124,58,237,0.25)"}/>
+          <label style={{...fLb,color:"rgba(200,180,255,0.6)"}}>Color de portada</label>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}}>
+            {BOOK_PALETTE.map(c=><div key={c} onClick={()=>setColor(c)} style={{width:32,height:32,borderRadius:999,background:c,cursor:"pointer",border:color===c?"3px solid rgba(255,255,255,0.6)":"3px solid transparent",transform:color===c?"scale(1.15)":"scale(1)",transition:"all .15s"}}/>)}
+          </div>
+          {isConnected&&(<>
+            <label style={{...fLb,color:"rgba(200,180,255,0.6)"}}>Nombre de la saga</label>
+            <input value={sagaName} onChange={e=>setSagaName(e.target.value)} placeholder="Crónicas del Vacío..."
+              style={{...fIn,background:"rgba(255,255,255,0.05)",border:"1.5px solid rgba(124,58,237,0.25)",color:"#fdf6e3",marginBottom:16,fontSize:16}}
+              onFocus={e=>e.target.style.borderColor="rgba(124,58,237,0.8)"} onBlur={e=>e.target.style.borderColor="rgba(124,58,237,0.25)"}/>
+            <label style={{...fLb,color:"rgba(200,180,255,0.6)"}}>Nº en la saga</label>
+            <input type="number" min="1" value={sagaOrder} onChange={e=>setSagaOrder(Number(e.target.value))}
+              style={{...fIn,background:"rgba(255,255,255,0.05)",border:"1.5px solid rgba(124,58,237,0.25)",color:"#fdf6e3",marginBottom:16,width:100,fontSize:16}}
+              onFocus={e=>e.target.style.borderColor="rgba(124,58,237,0.8)"} onBlur={e=>e.target.style.borderColor="rgba(124,58,237,0.25)"}/>
+            {library.length>0&&(<><label style={{...fLb,color:"rgba(200,180,255,0.6)"}}>Conectar con (opcional)</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
+                {library.map(b=><div key={b.id} onClick={()=>toggleConn(b.id)} style={{padding:"7px 14px",borderRadius:999,border:`1px solid ${connectedTo.includes(b.id)?"rgba(124,58,237,0.7)":"rgba(124,58,237,0.2)"}`,background:connectedTo.includes(b.id)?"rgba(124,58,237,0.15)":"transparent",color:connectedTo.includes(b.id)?"#a78bfa":"rgba(200,180,255,0.5)",cursor:"pointer",fontSize:13,fontFamily:"Georgia,serif",display:"flex",alignItems:"center",gap:6}}>
+                  <div style={{width:8,height:8,borderRadius:999,background:b.color||C.accent,flexShrink:0}}/>
+                  {b.title.length>18?b.title.slice(0,17)+"…":b.title}
+                </div>)}
+              </div></>)}
+          </>)}
+          {/* Preview */}
+          <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
+            <div style={{width:70,height:98,background:`linear-gradient(160deg,${color}cc,${color}77)`,borderRadius:5,boxShadow:"4px 4px 16px rgba(0,0,0,0.5)",display:"flex",flexDirection:"column",justifyContent:"flex-end",padding:6,position:"relative",overflow:"hidden"}}>
+              <div style={{position:"absolute",top:0,bottom:0,right:0,width:5,background:"rgba(0,0,0,0.15)"}}/>
+              <div style={{fontSize:9,fontFamily:"Georgia,serif",color:"rgba(255,255,255,0.9)",lineHeight:1.3,fontWeight:600,position:"relative",zIndex:1}}>{title||"Mi nueva obra"}</div>
+            </div>
+          </div>
+          <button onClick={()=>canSubmit&&onConfirm({title:title.trim(),color,type:isConnected?"saga":"standalone",sagaName:sagaName.trim(),sagaOrder,connectedTo})} disabled={!canSubmit}
+            style={{...primBtn(!canSubmit),width:"100%",justifyContent:"center",padding:"14px",fontSize:15,background:canSubmit?color:"rgba(100,80,150,0.3)",boxShadow:canSubmit?`0 4px 20px ${color}55`:"none"}}>
+            {isConnected?"∞ Crear":"✦ Comenzar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// UI COMPONENTS
+// ═══════════════════════════════════════════════════════════
+function Modal({title,sub,onClose,children,wide}){
+  const isMobile=useMobile();
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(26,24,37,0.5)",display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",zIndex:1000,padding:isMobile?0:20,backdropFilter:"blur(4px)"}} className="modal-wrap">
+      <div style={{background:C.surface,borderRadius:isMobile?"20px 20px 0 0":20,width:"100%",maxWidth:isMobile?"100%":wide?700:500,maxHeight:isMobile?"90vh":"88vh",overflow:"auto",boxShadow:shM}} className="modal-box">
+        <div style={{padding:"20px 24px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"flex-start",position:"sticky",top:0,background:C.surface,zIndex:1}}>
+          <div>
+            <h3 style={{margin:0,fontSize:17,fontFamily:"Georgia,serif",color:C.text}}>{title}</h3>
+            {sub&&<p style={{margin:"4px 0 0",fontSize:13,color:C.mid,fontFamily:"Georgia,serif"}}>{sub}</p>}
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:C.light,cursor:"pointer",fontSize:20,padding:8}}>✕</button>
+        </div>
+        <div style={{padding:24}}>{children}</div>
+      </div>
+    </div>
+  );
+}
+function Fld({label,value,onChange,ph,h=80,ta=false}){
+  return(
+    <div style={{marginBottom:16}}>
+      {label&&<label style={fLb}>{label}</label>}
+      {ta?<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={ph} style={{...fIn,minHeight:h,resize:"vertical",lineHeight:1.7,fontSize:15}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+        :<input value={value} onChange={e=>onChange(e.target.value)} placeholder={ph} style={{...fIn,fontSize:15}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>}
+    </div>
+  );
+}
+function AiBtn({label,onClick,busy}){
+  return(
+    <button onClick={onClick} disabled={busy} style={{display:"inline-flex",alignItems:"center",gap:5,padding:"8px 16px",borderRadius:999,border:`1px solid ${C.aMid}55`,background:C.aSoft,color:C.accent,cursor:busy?"not-allowed":"pointer",fontFamily:"Georgia,serif",fontSize:12,fontWeight:500}}>
+      {busy?"⏳":"✦"} {label}
+    </button>
+  );
+}
+function Tag({children,color=C.accent}){
+  return <span style={{display:"inline-block",padding:"2px 10px",borderRadius:999,background:color+"18",border:`1px solid ${color}30`,color,fontSize:11,fontFamily:"Georgia,serif",fontWeight:500}}>{children}</span>;
+}
+function SecHdr({title,sub,action}){
+  return(
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:24,flexWrap:"wrap",gap:12}}>
+      <div>
+        <h2 style={{margin:0,fontSize:24,fontFamily:"Georgia,serif",color:C.text,fontWeight:400}}>{title}</h2>
+        {sub&&<p style={{margin:"5px 0 0",color:C.mid,fontSize:13,fontFamily:"Georgia,serif"}}>{sub}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════
+function App(){
+  const isMobile=useMobile();
+
+  // ── Auth state ──
+  const [user,setUser]=useState(null);
+  const [authReady,setAuthReady]=useState(false);
+  const [apiKey,setApiKey]=useState(null);
+  const [showSettings,setShowSettings]=useState(false);
+  const [screen,setScreen]=useState("loading");
+  const [library,setLibrary]=useState([]);
+  const [activeBook,setActiveBook]=useState(null);
+  const [showLibrary,setShowLibrary]=useState(false);
+  const [newBookType,setNewBookType]=useState(null);
+  const [sidebarOpen,setSidebarOpen]=useState(false);
+
+  // ── Sync state ──
+  const [savedAt,setSavedAt]=useState(null);
+  const [syncStatus,setSyncStatus]=useState("synced");
+  const [linkedDocId,setLinkedDocId]=useState(null);   // Google Doc vinculado al libro activo
+  const [docSyncStatus,setDocSyncStatus]=useState("idle"); // idle | syncing | synced | error
+
+  const [view,setView]=useState("engine");
+  const [busy,setBusy]=useState(false);
+  const [aiField,setAiField]=useState(null);
+  const [toast,setToast]=useState(null);
+  const [modal,setModal]=useState(null);
+
+  const [idea,setIdea]=useState(""); const [synopsis,setSynopsis]=useState("");
+  const [outline,setOutline]=useState(""); const [beats,setBeats]=useState("");
+  const [prose,setProse]=useState(""); const [step,setStep]=useState(0);
+  const [manuscript,setManuscript]=useState("");
+  const [msMode,setMsMode]=useState("full");        // "full" | "chapter"
+  const [msChapterIdx,setMsChapterIdx]=useState(0); // índice del capítulo activo
+  const [writingChapter,setWritingChapter]=useState(false); // AI escribiendo
+  const [selText,setSelText]=useState(""); const [selRange,setSelRange]=useState([0,0]);
+  const [showTools,setShowTools]=useState(false);
+  const taRef=useRef(null);
+
+  const [characters,setCharacters]=useState([]); const [charForm,setCharForm]=useState(null);
+  const [worldData,setWorldData]=useState(EW); const [structure,setStructure]=useState(ES);
+  const [escaleta,setEscaleta]=useState([]); const [escaletaForm,setEscaletaForm]=useState(null);
+  const [chapters,setChapters]=useState([]);
+  const [codex,setCodex]=useState([]); const [codexForm,setCodexForm]=useState(null);
+  const [lorebook,setLorebook]=useState([]); const [lbForm,setLbForm]=useState(null);
+  const [bsCat,setBsCat]=useState("nombres de personajes"); const [bsCtx,setBsCtx]=useState("");
+  const [bsResults,setBsResults]=useState([]); const [bsFavs,setBsFavs]=useState([]);
+  const [mapNodes,setMapNodes]=useState([]); const [mapLinks,setMapLinks]=useState([]);
+  const [mapFilter,setMapFilter]=useState("all");
+  const [addNodeForm,setAddNodeForm]=useState(null); const [addLinkForm,setAddLinkForm]=useState(null);
+  const [arcos,setArcos]=useState([]); const [arcosForm,setArcosForm]=useState(null);
+  const svgRef=useRef(null);
+  const [impStep,setImpStep]=useState(0); const [impText,setImpText]=useState("");
+  const [impFiles,setImpFiles]=useState([]); const [impExtracted,setImpExtracted]=useState(null);
+  const [impSel,setImpSel]=useState({}); const [impBusy,setImpBusy]=useState(false);
+  const [impError,setImpError]=useState(null);
+  const [pubFormat,setPubFormat]=useState(null); const [pubSource,setPubSource]=useState("manuscript");
+  const [pubResult,setPubResult]=useState(""); const [pubBusy,setPubBusy]=useState(false);
+  const [pubCopied,setPubCopied]=useState(false);
+  const [pubOpts,setPubOpts]=useState({tone:"",audience:"",selOpt:"",chapterSel:0});
+
+  const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(null),4500);};
+  const AI=useCallback((msgs,sys,max)=>callAI(msgs,sys,max,apiKey),[apiKey]);
+
+  // ── Wire sync callback ──
+  useEffect(()=>{ _onSynced=(ts)=>{setSavedAt(ts);setSyncStatus("synced");}; return()=>{_onSynced=null;}; },[]);
+
+  // ── Save (cloud + local) ──
+  const save=useCallback((k,v,immediate=false)=>{
+    if(!activeBook?.id) return;
+    setSyncStatus("syncing");
+    queueWrite(activeBook.id,k,v,immediate);
+  },[activeBook?.id]);
+
+  // ── Debounced manuscript save ──
+  const debouncedSaveMs=useCallback(
+    debounce((bid,text)=>{ setSyncStatus("syncing"); queueWrite(bid,"manuscript",text); },800),
+    []
+  );
+  // ── Firebase auth listener ──
+  useEffect(()=>{
+    const unsub=fbAuth.onAuthStateChanged(async(fbUser)=>{
+      setUser(fbUser); setAuthReady(true);
+      if(fbUser){
+        await _migrateLocal(fbUser.uid);
+        const key=await _loadApiKey(); setApiKey(key);
+        const lib=await _loadLib(); setLibrary(lib);
+        setScreen(key?"home":"setup");
+      } else {
+        setApiKey(null); setLibrary([]);
+        setScreen("login");
+      }
+    });
+    return unsub;
+  },[]);
+
+  // ── Network status ──
+  useEffect(()=>{
+    const on=()=>setSyncStatus("synced"); const off=()=>setSyncStatus("offline");
+    window.addEventListener("online",on); window.addEventListener("offline",off);
+    return()=>{ window.removeEventListener("online",on); window.removeEventListener("offline",off); };
+  },[]);
+
+  // ── Flush on page unload ──
+  useEffect(()=>{ const h=()=>flushNow(); window.addEventListener("beforeunload",h); return()=>window.removeEventListener("beforeunload",h); },[]);
+
+  // ── Update word count ──
+  useEffect(()=>{
+    if(activeBook?.id && manuscript!==undefined){
+      const wc=manuscript.split(/\s+/).filter(Boolean).length;
+      setLibrary(prev=>{
+        const next=prev.map(b=>b.id===activeBook.id?{...b,wordCount:wc,lastEdited:new Date().toISOString()}:b);
+        _saveLib(next);
+        return next;
+      });
+    }
+  },[manuscript,activeBook?.id]);
+
+  // ── Load book (cloud first, localStorage fallback) ──
+  const loadBook=useCallback(async(book)=>{
+    const id=book.id;
+    const cloud=await _loadBookCloud(id);
+    const get=(k,fb)=>cloud?.[k]??_lsb(id,k,fb);
+    setIdea(get("idea","")); setSynopsis(get("synopsis","")); setOutline(get("outline",""));
+    setBeats(get("beats","")); setProse(get("prose","")); setStep(get("step",0));
+    setManuscript(get("manuscript",""));
+    setCharacters(get("characters",[])); setWorldData(get("world",EW));
+    setStructure(get("structure",ES)); setEscaleta(get("escaleta",[]));
+    setChapters(get("chapters",[]));
+    setCodex(get("codex",[])); setLorebook(get("lorebook",[]));
+    setBsFavs(get("bsfavs",[]));
+    setMapNodes(get("mapnodes",[])); setMapLinks(get("maplinks",[]));
+    setArcos(get("arcos",[]));
+    setView("engine"); setShowTools(false); setModal(null); setSidebarOpen(false);
+    setSavedAt(null);
+    // Google Docs link
+    const docId = cloud?.linkedDocId ?? _lsb(book.id,"linkedDocId",null);
+    setLinkedDocId(docId||null);
+    setDocSyncStatus("idle");
+  },[]);
+
+  const openBook=async(book,gotoView)=>{
+    setActiveBook(book); await loadBook(book);
+    setScreen("app"); setShowLibrary(false);
+    if(gotoView) setTimeout(()=>setView(gotoView),50);
+  };
+
+  const createBook=async(data)=>{
+    const book={id:newBookId(),title:data.title,type:data.type,color:data.color,sagaName:data.sagaName||"",sagaOrder:data.sagaOrder||1,connectedTo:data.connectedTo||[],createdAt:new Date().toISOString(),lastEdited:new Date().toISOString(),wordCount:0};
+    const newLib=[book,...library]; setLibrary(newLib); await _saveLib(newLib);
+    setNewBookType(null); openBook(book);
+  };
+
+  const deleteBook=async(bookId)=>{
+    const newLib=library.filter(b=>b.id!==bookId); setLibrary(newLib); await _saveLib(newLib);
+    if(activeBook?.id===bookId){setActiveBook(null);setScreen("home");}
+  };
+
+  const handleSaveApiKey=async(key)=>{
+    await _saveApiKey(key); setApiKey(key);
+    setShowSettings(false); if(screen==="setup") setScreen("home");
+  };
+
+  // ── Google Docs: vincular / crear Doc ──────────────────────
+  const handleLinkGoogleDoc = async () => {
+    const uid = fbAuth.currentUser?.uid;
+    if (!uid || !activeBook) return;
+    if (GDOCS_CLIENT_ID.startsWith("TU_OAUTH")) {
+      showToast("⚠ Falta configurar el GDOCS_CLIENT_ID en el código.");
+      return;
+    }
+    setDocSyncStatus("syncing");
+    try {
+      const docId = await _gDocsCreate(activeBook.title + " — NovelAI Studio");
+      // Escribir contenido inicial si hay manuscrito
+      if (manuscript.trim()) await _gDocsWrite(docId, manuscript);
+      setLinkedDocId(docId);
+      await _saveLinkedDocId(uid, activeBook.id, docId);
+      setDocSyncStatus("synced");
+      showToast("✓ Google Doc creado y vinculado");
+      window.open(`https://docs.google.com/document/d/${docId}/edit`, "_blank");
+    } catch(e) {
+      setDocSyncStatus("error");
+      showToast("⚠ " + e.message);
+    }
+  };
+
+  // ── Google Docs: push (NovelAI → Docs) ────────────────────
+  const handlePushToDoc = async () => {
+    if (!linkedDocId) return;
+    setDocSyncStatus("syncing");
+    try {
+      await _gDocsWrite(linkedDocId, manuscript);
+      setDocSyncStatus("synced");
+      showToast("✓ Manuscrito enviado a Google Docs");
+    } catch(e) {
+      setDocSyncStatus("error");
+      showToast("⚠ " + e.message);
+    }
+  };
+
+  // ── Google Docs: pull (Docs → NovelAI) ────────────────────
+  const handlePullFromDoc = async () => {
+    if (!linkedDocId) return;
+    setDocSyncStatus("syncing");
+    try {
+      const text = await _gDocsRead(linkedDocId);
+      setManuscript(text);
+      save("manuscript", text);
+      setDocSyncStatus("synced");
+      showToast("✓ Manuscrito importado desde Google Docs");
+    } catch(e) {
+      setDocSyncStatus("error");
+      showToast("⚠ " + e.message);
+    }
+  };
+
+  // ── Google Docs: desvincular ──────────────────────────────
+  const handleUnlinkDoc = async () => {
+    if (!confirm("¿Desvincular este libro de su Google Doc? El documento no se borrará.")) return;
+    const uid = fbAuth.currentUser?.uid;
+    setLinkedDocId(null);
+    setDocSyncStatus("idle");
+    if (uid && activeBook?.id) await _saveLinkedDocId(uid, activeBook.id, null);
+  };
+
+  // ── Debounced auto-sync to Google Docs ────────────────────
+  const debouncedDocSync = useCallback(
+    debounce(async (docId, text) => {
+      if (!docId) return;
+      try { await _gDocsWrite(docId, text); setDocSyncStatus("synced"); }
+      catch { setDocSyncStatus("error"); }
+    }, 5000), // 5s debounce para Docs (más lento que Firebase)
+  []);
+
+  // ── Context ──
+  // Build rich context for the AI — includes full story bible
+  const buildCtx=useCallback((text="")=>{
+    let ctx="Eres un experto novelista. TRABAJA SIEMPRE DENTRO DEL UNIVERSO ESTABLECIDO DE ESTA NOVELA. Usa SOLO los personajes, lugares y elementos que aparecen en el texto y en la biblia. NO inventes nada nuevo.\n\n";
+    if(activeBook?.title) ctx+=`TÍTULO DE LA OBRA: ${activeBook.title}\n`;
+    if(idea) ctx+=`IDEA CENTRAL: ${idea.slice(0,200)}\n`;
+    if(synopsis) ctx+=`SINOPSIS: ${synopsis.slice(0,400)}\n`;
+    if(worldData.genre) ctx+=`GÉNERO: ${worldData.genre}\n`;
+    if(worldData.tone) ctx+=`TONO: ${worldData.tone}\n`;
+    if(structure.theme) ctx+=`TEMA: ${structure.theme}\n`;
+    if(structure.premise) ctx+=`PREMISA: ${structure.premise}\n`;
+    if(characters.length){
+      ctx+="\nPERSONAJES (usa SOLO estos):\n";
+      characters.forEach(c=>{
+        ctx+=`• ${c.name} [${ROLE_LBL[c.role]||c.role}]: ${c.appearance||""}`;
+        if(c.fears) ctx+=` | Miedo: ${c.fears}`;
+        if(c.secret) ctx+=` | Secreto: ${c.secret}`;
+        if(c.arcStart&&c.arcEnd) ctx+=` | Arco: ${c.arcStart} → ${c.arcEnd}`;
+        ctx+="\n";
+      });
+    }
+    if(codex.length){ctx+="\nELEMENTOS DEL MUNDO:\n";codex.slice(0,8).forEach(e=>{ctx+=`• ${e.name}: ${e.desc.slice(0,100)}\n`;});}
+    if(lorebook.length&&text){const act=lorebook.filter(e=>(e.keywords||[]).some(k=>k&&text.toLowerCase().includes(k.toLowerCase())));if(act.length){ctx+="\nLORE ACTIVO:\n";act.forEach(e=>{ctx+=`• ${e.content.slice(0,150)}\n`;});}}
+    return ctx;
+  },[characters,codex,lorebook,worldData,structure,idea,synopsis,activeBook]);
+
+  // Extract surrounding context (±600 chars) around selected text in manuscript
+  const getSurroundingContext=useCallback(()=>{
+    if(!manuscript||!selText) return "";
+    const idx=manuscript.indexOf(selText);
+    if(idx===-1) return manuscript.slice(0,600);
+    const start=Math.max(0,idx-600);
+    const end=Math.min(manuscript.length,idx+selText.length+600);
+    const before=manuscript.slice(start,idx);
+    const after=manuscript.slice(idx+selText.length,end);
+    return `${start>0?"[...] ":""}${before}【FRAGMENTO SELECCIONADO: ${selText}】${after}${end<manuscript.length?" [...]":""}`;
+  },[manuscript,selText]);
+
+  const aiGen=async(prompt,sys,setter,key)=>{
+    setBusy(true);setAiField(key);
+    try{const r=await AI([{role:"user",content:prompt}],sys,700);setter(r.trim());}
+    catch(e){showToast("⚠ "+e.message);}
+    setBusy(false);setAiField(null);
+  };
+
+  // ── Engine ──
+  const genEngine=async()=>{
+    setBusy(true);const ctx=buildCtx(idea+synopsis);
+    try{
+      if(step===0){const r=await AI([{role:"user",content:"Sinopsis apasionante de 4 párrafos:\n\n"+idea}],ctx,800);setSynopsis(r);save("synopsis",r);setStep(1);save("step",1);}
+      else if(step===1){const r=await AI([{role:"user",content:"Esquema 12 capítulos:\n\n"+synopsis}],ctx,1000);setOutline(r);save("outline",r);setStep(2);save("step",2);}
+      else if(step===2){const r=await AI([{role:"user",content:"Story beats primeros 3 capítulos:\n\n"+outline}],ctx,1000);setBeats(r);save("beats",r);setStep(3);save("step",3);}
+      else if(step===3){const r=await AI([{role:"user",content:"Primer capítulo completo, mínimo 800 palabras. Beats:\n\n"+beats}],ctx,1000);setProse(r);save("prose",r);setStep(4);save("step",4);}
+    }catch(e){showToast("⚠ "+e.message);}
+    setBusy(false);
+  };
+
+  // ── Manuscript ──
+  const handleSel=()=>{
+    const ta=taRef.current;if(!ta)return;
+    const s=ta.value.substring(ta.selectionStart,ta.selectionEnd).trim();
+    if(s.length>3){setSelText(s);setSelRange([ta.selectionStart,ta.selectionEnd]);setShowTools(true);}
+    else setShowTools(false);
+  };
+  const insertResult=text=>{
+    const n=manuscript.substring(0,selRange[0])+text+manuscript.substring(selRange[1]);
+    setManuscript(n);debouncedSaveMs(activeBook?.id,n);setModal(null);setShowTools(false);
+  };
+  const openDescribe=async()=>{
+    setBusy(true);setModal({type:"describe",results:null,original:selText});
+    const ctx=buildCtx(manuscript);
+    const surroundCtx=getSurroundingContext();
+    try{
+      const raw=await AI([{role:"user",content:`Analiza este fragmento de la novela y genera 6 opciones sensoriales para REESCRIBIRLO con riqueza poética. Mantén los mismos personajes y hechos, solo enriquece la descripción.\n\nCONTEXTO DEL TEXTO:\n${surroundCtx}\n\nFRAGMENTO A ENRIQUECER:\n"${selText}"\n\nResponde SOLO en JSON sin markdown:\n{"vista":"...","olfato":"...","tacto":"...","oído":"...","gusto":"...","metáfora":"..."}`}],ctx,900);
+      const p=JSON.parse(raw.replace(/```json|```/g,"").trim());setModal({type:"describe",results:p,original:selText});
+    }catch(e){setModal({type:"describe",results:{error:"Error al generar. Inténtalo de nuevo."},original:selText});}
+    setBusy(false);
+  };
+  const openRewrite=async(mode)=>{
+    setBusy(true);setModal({type:"rewrite",mode,results:null,original:selText});
+    const ctx=buildCtx(manuscript);
+    const surroundCtx=getSurroundingContext();
+    const pm={
+      descriptivo:"Reescribe este fragmento con MÁS detalles sensoriales y descriptivos. Mantén los MISMOS personajes y hechos de la novela:",
+      intenso:"Reescribe con mayor tensión dramática y ritmo urgente. Mismos personajes y hechos:",
+      corto:"Reescribe de forma más concisa sin perder la esencia. Mismos personajes:",
+      pov:"Reescribe cambiando el punto de vista narrativo (1ª↔3ª persona). Mismos personajes:",
+      cliffhanger:"Reescribe terminando en un cliffhanger irresistible que encaje con la trama:",
+      giro:"Reescribe introduciendo un giro inesperado pero coherente con la historia ya establecida:",
+      tension:"Reescribe con frases cortas, urgencia y amenaza implícita. Mismo contexto:",
+      dialogo:"Convierte este texto en un diálogo natural con subtexto entre los personajes de la historia:",
+      flashback:"Transforma en un flashback evocador que sea coherente con el pasado de los personajes:",
+      foreshadow:"Añade presagios sutiles coherentes con los conflictos y secretos ya establecidos en la historia:",
+      metafora:"Enriquece con metáforas originales relacionadas con el mundo y tono de la novela:",
+      ritmo:"Altera el ritmo narrativo (más lento/rápido) para mayor impacto emocional:"
+    };
+    try{
+      const userMsg=`CONTEXTO DEL TEXTO (para entender qué ha pasado antes y después):\n${surroundCtx}\n\nFRAGMENTO A TRANSFORMAR:\n"${selText}"\n\n${pm[mode]}\n\nIMPORTANTE: Usa SOLO los personajes y elementos ya establecidos en la novela. Responde solo con el fragmento reescrito, sin explicaciones.`;
+      const r=await AI([{role:"user",content:userMsg}],ctx,900);
+      setModal({type:"rewrite",mode,results:r,original:selText});
+    }
+    catch(e){showToast("⚠ "+e.message);setModal(null);}
+    setBusy(false);
+  };
+
+  const runBrainstorm=async()=>{
+    setBusy(true);
+    try{const r=await AI([{role:"user",content:"10 ideas para:"+bsCat+(bsCtx?"\nContexto:"+bsCtx:"")+"\nUna por línea."}],buildCtx(),600);setBsResults(r.split("\n").map(l=>l.replace(/^[\-•\d.]\s*/,"").trim()).filter(Boolean).slice(0,10));}
+    catch(e){showToast("⚠ "+e.message);}
+    setBusy(false);
+  };
+
+  // ── Escribir capítulo con IA ──────────────────────────────
+  const writeChapterWithAI=async(chIdx)=>{
+    const ch=chapters[chIdx];
+    if(!ch) return;
+    setWritingChapter(true);
+    const ctx=buildCtx(manuscript);
+
+    // Build chapter-specific context
+    const prevChapters=chapters.slice(0,chIdx).map((c,i)=>`Capítulo ${i+1}: ${c.title} — ${c.notes||"(sin notas)"}`).join("\n");
+    const nextChapters=chapters.slice(chIdx+1,chIdx+3).map((c,i)=>`Capítulo ${chIdx+2+i}: ${c.title} — ${c.notes||""}`).join("\n");
+    const escaletaForCh=escaleta.slice(chIdx*2,chIdx*2+3).map(e=>`• ${e.title}: ${e.summary||""}`).join("\n");
+
+    // Find relevant arc phases
+    const arcPhases=arcos.map(arc=>{
+      const phase=arc.phases?.find(p=>p.desc);
+      return phase?`[${arc.title}] Fase actual: ${phase.label} — ${phase.desc}`:"";
+    }).filter(Boolean).join("\n");
+
+    // Extract existing text for this chapter if any
+    const chMarker=`=== CAPÍTULO ${chIdx+1}:`;
+    const existingIdx=manuscript.indexOf(chMarker);
+    const existingText=existingIdx!==-1
+      ? manuscript.slice(existingIdx, manuscript.indexOf("\n===",existingIdx+10)||manuscript.length)
+      : "";
+
+    const prompt=`Escribe el CAPÍTULO ${chIdx+1}: "${ch.title}" de la novela.
+
+INSTRUCCIONES:
+- Mínimo 800 palabras, máximo 1500
+- Usa SOLO los personajes y elementos ya establecidos en la biblia
+- Mantén el tono, la voz narrativa y el estilo establecidos
+- Termina con un gancho que invite a seguir leyendo
+${existingText?`- Ya hay un borrador, reescríbelo mejorándolo`:"- Comienza desde cero con el incipit"}
+
+NOTAS DEL CAPÍTULO:
+${ch.notes||"Sin notas específicas — usa el contexto de la historia"}
+
+CAPÍTULOS ANTERIORES:
+${prevChapters||"Este es el primer capítulo"}
+
+PRÓXIMOS CAPÍTULOS (para mantener continuidad):
+${nextChapters||"No hay información sobre capítulos siguientes"}
+
+ESCALETA RELEVANTE:
+${escaletaForCh||"Sin escenas definidas para este capítulo"}
+
+ARCOS EN JUEGO:
+${arcPhases||"Sin arcos definidos"}
+
+${existingText?`BORRADOR ACTUAL (reescribe y mejora):\n${existingText.slice(0,1000)}`:""}
+
+Escribe SOLO el texto del capítulo, sin títulos, sin comentarios, sin explicaciones.`;
+
+    try{
+      const result=await AI([{role:"user",content:prompt}],ctx,1500);
+      const chTitle=`\n\n=== CAPÍTULO ${chIdx+1}: ${ch.title.toUpperCase()} ===\n\n`;
+      let newMs;
+      if(existingIdx!==-1){
+        // Replace existing chapter content
+        const endIdx=manuscript.indexOf("\n===",existingIdx+10);
+        newMs=manuscript.slice(0,existingIdx)+chTitle+result+(endIdx!==-1?manuscript.slice(endIdx):"\n");
+      } else {
+        // Append new chapter
+        newMs=manuscript+(manuscript&&!manuscript.endsWith("\n\n")?"\n\n":"")+chTitle+result;
+      }
+      setManuscript(newMs);
+      queueWrite(activeBook.id,"manuscript",newMs,true);
+      setSyncStatus("syncing");
+      // Update chapter status to wip
+      const updatedChs=chapters.map((c,i)=>i===chIdx?{...c,status:"wip"}:c);
+      setChapters(updatedChs);
+      save("chapters",updatedChs,true);
+      showToast(`✓ Capítulo ${chIdx+1} escrito — ${result.split(/\s+/).filter(Boolean).length} palabras`);
+    }catch(e){
+      showToast("⚠ "+e.message);
+    }
+    setWritingChapter(false);
+  };
+
+  // ── CRUD ──
+  const saveCodex=e=>{const n=e.id?codex.map(x=>x.id===e.id?e:x):[...codex,{...e,id:Date.now().toString()}];setCodex(n);save("codex",n,true);setCodexForm(null);};
+  const delCodex=id=>{const n=codex.filter(e=>e.id!==id);setCodex(n);save("codex",n,true);};
+  const saveLb=entry=>{const e={...entry,keywords:entry.kws?entry.kws.split(",").map(k=>k.trim()).filter(Boolean):[]};delete e.kws;const n=e.id?lorebook.map(l=>l.id===e.id?e:l):[...lorebook,{...e,id:Date.now().toString()}];setLorebook(n);save("lorebook",n,true);setLbForm(null);};
+  const delLb=id=>{const n=lorebook.filter(e=>e.id!==id);setLorebook(n);save("lorebook",n,true);};
+  const saveChar=ch=>{const n=ch.id?characters.map(x=>x.id===ch.id?ch:x):[...characters,{...ch,id:Date.now().toString()}];setCharacters(n);save("characters",n,true);setCharForm(null);};
+  const delChar=id=>{const n=characters.filter(c=>c.id!==id);setCharacters(n);save("characters",n,true);};
+  const saveWorld=w=>{setWorldData(w);save("world",w,true);};
+  const saveStr=s=>{setStructure(s);save("structure",s,true);};
+  const saveEsc=e=>{const n=e.id?escaleta.map(x=>x.id===e.id?e:x):[...escaleta,{...e,id:Date.now().toString()}];setEscaleta(n);save("escaleta",n,true);setEscaletaForm(null);};
+  const delEsc=id=>{const n=escaleta.filter(e=>e.id!==id);setEscaleta(n);save("escaleta",n,true);};
+  const addCh=()=>{const n=[...chapters,{id:Date.now().toString(),title:"Capítulo "+(chapters.length+1),notes:"",status:"draft"}];setChapters(n);save("chapters",n,true);};
+  const updCh=(id,ch)=>{const n=chapters.map(c=>c.id===id?{...c,...ch}:c);setChapters(n);save("chapters",n,true);};
+  const delCh=id=>{const n=chapters.filter(c=>c.id!==id);setChapters(n);save("chapters",n,true);};
+
+  // ── Map ──
+  const buildAllMapNodes=useCallback(()=>{
+    const nodes=[];
+    characters.forEach(c=>nodes.push({id:"c-"+c.id,label:c.name||"Personaje",type:c.role,group:"cast"}));
+    codex.forEach(e=>nodes.push({id:"cx-"+e.id,label:e.name,type:e.type||"otro",group:"world"}));
+    lorebook.forEach(e=>nodes.push({id:"lb-"+e.id,label:(e.keywords||[])[0]||"Entrada",type:"lorebook",group:"world"}));
+    escaleta.slice(0,12).forEach(e=>nodes.push({id:"es-"+e.id,label:e.title||"Escena",type:"escena",group:"plot"}));
+    if(structure.theme) nodes.push({id:"s-theme",label:"Tema",type:"tema",group:"structure"});
+    if(structure.incitingIncident) nodes.push({id:"s-inc",label:"Incidente",type:"structure",group:"structure"});
+    if(structure.climax) nodes.push({id:"s-cli",label:"Clímax",type:"structure",group:"structure"});
+    mapNodes.forEach(n=>nodes.push({...n,group:"custom"}));
+    return nodes;
+  },[characters,codex,lorebook,escaleta,structure,mapNodes]);
+
+  const saveMapNode=form=>{const n=[...mapNodes,{id:"cn-"+Date.now(),label:form.label,type:"custom",group:"custom"}];setMapNodes(n);save("mapnodes",n,true);setAddNodeForm(null);};
+  const saveMapLink=form=>{const n=[...mapLinks,{id:"ml-"+Date.now(),source:form.source,target:form.target,label:form.label||""}];setMapLinks(n);save("maplinks",n,true);setAddLinkForm(null);};
+  const delMapLink=id=>{const n=mapLinks.filter(l=>l.id!==id);setMapLinks(n);save("maplinks",n,true);};
+
+  // ── Arcos argumentales ──
+  const EAR={id:null,title:"",type:"principal",characters:[],phases:[
+    {id:"p1",label:"Detonante",desc:""},
+    {id:"p2",label:"Escalada",desc:""},
+    {id:"p3",label:"Punto de no retorno",desc:""},
+    {id:"p4",label:"Crisis",desc:""},
+    {id:"p5",label:"Resolución",desc:""}
+  ],notes:""};
+  const saveArco=a=>{
+    const n=a.id?arcos.map(x=>x.id===a.id?a:x):[...arcos,{...a,id:"arc-"+Date.now()}];
+    setArcos(n);save("arcos",n,true);setArcosForm(null);
+  };
+  const delArco=id=>{const n=arcos.filter(a=>a.id!==id);setArcos(n);save("arcos",n,true);};
+
+  // ── Map linking mode state (module-level to survive React re-renders) ──
+  const mapLinkingRef=useRef(null); // {id, label} of node being linked from
+
+  useEffect(()=>{
+    if(view!=="mapa"||!svgRef.current) return;
+    const allNodes=buildAllMapNodes();
+    const filtered=mapFilter==="all"?allNodes:allNodes.filter(n=>({cast:"cast",world:"world",plot:"plot",structure:["structure","custom"]}[mapFilter]||[mapFilter]).includes(n.group));
+    const nodeIds=new Set(filtered.map(n=>n.id));
+    const links=mapLinks.filter(l=>nodeIds.has(l.source)&&nodeIds.has(l.target)).map(l=>({...l}));
+    const nodes=filtered.map(n=>({...n}));
+    const el=svgRef.current;const{width:W,height:H}=el.getBoundingClientRect();
+    const svg=d3.select(el);svg.selectAll("*").remove();
+    // Defs
+    const defs=svg.append("defs");
+    defs.append("marker").attr("id","arr").attr("viewBox","0 -4 8 8").attr("refX",30).attr("refY",0).attr("markerWidth",6).attr("markerHeight",6).attr("orient","auto").append("path").attr("d","M0,-4L8,0L0,4").attr("fill","#c4b5fd").attr("fill-opacity",.8);
+    defs.append("marker").attr("id","arr-sel").attr("viewBox","0 -4 8 8").attr("refX",30).attr("refY",0).attr("markerWidth",6).attr("markerHeight",6).attr("orient","auto").append("path").attr("d","M0,-4L8,0L0,4").attr("fill","#7c3aed");
+    const g=svg.append("g");
+    const zoom=d3.zoom().scaleExtent([.15,5]).on("zoom",e=>g.attr("transform",e.transform));svg.call(zoom);
+    window.__mapZoom=()=>svg.transition().duration(600).call(zoom.transform,d3.zoomIdentity.translate(W/2,H/2).scale(.85));
+    setTimeout(()=>window.__mapZoom&&window.__mapZoom(),100);
+
+    const sim=d3.forceSimulation(nodes)
+      .force("link",d3.forceLink(links).id(d=>d.id).distance(160))
+      .force("charge",d3.forceManyBody().strength(-500))
+      .force("center",d3.forceCenter(W/2,H/2))
+      .force("collide",d3.forceCollide(55));
+
+    // Links layer
+    const linkG=g.append("g").attr("class","links");
+    const linkSel=linkG.selectAll("g").data(links).join("g");
+    const linkLine=linkSel.append("line").attr("stroke","#c4b5fd").attr("stroke-width",2).attr("stroke-opacity",.5).attr("marker-end","url(#arr)").style("cursor","pointer");
+    linkSel.append("text").text(d=>d.label).attr("text-anchor","middle").attr("font-size",10).attr("fill",C.light).attr("font-family","Georgia,serif").style("pointer-events","none");
+    // Double-click on link to delete
+    linkLine.on("dblclick",(event,d)=>{
+      event.stopPropagation();
+      if(confirm(`¿Eliminar la conexión "${d.label||d.source.id+"→"+d.target.id}"?`)){
+        const newLinks=mapLinks.filter(l=>l.id!==d.id);
+        setMapLinks(newLinks);save("maplinks",newLinks,true);
+      }
+    });
+    // Hover highlight links
+    linkLine.on("mouseover",function(){d3.select(this).attr("stroke","#7c3aed").attr("stroke-opacity",1).attr("stroke-width",2.5).attr("marker-end","url(#arr-sel)");})
+             .on("mouseout",function(){d3.select(this).attr("stroke","#c4b5fd").attr("stroke-opacity",.5).attr("stroke-width",2).attr("marker-end","url(#arr)");});
+
+    // Nodes layer
+    const nodeG=g.append("g").attr("class","nodes");
+    const nodeEl=nodeG.selectAll("g").data(nodes).join("g").style("cursor","pointer");
+
+    // Outer ring (linking indicator)
+    nodeEl.append("circle").attr("r",32).attr("fill","transparent").attr("stroke","transparent").attr("stroke-width",3).attr("class","ring");
+    // Main circle
+    nodeEl.append("circle").attr("r",26).attr("fill",d=>(NODE_C[d.type]||"#6b7280")+"22").attr("stroke",d=>NODE_C[d.type]||"#6b7280").attr("stroke-width",2);
+    nodeEl.append("circle").attr("r",12).attr("fill",d=>(NODE_C[d.type]||"#6b7280")+"55");
+    // Type label (inner)
+    nodeEl.append("text").text(d=>d.type.slice(0,3).toUpperCase()).attr("text-anchor","middle").attr("dy",".35em").attr("font-size",7).attr("fill",d=>NODE_C[d.type]||"#6b7280").attr("font-weight","700").attr("font-family","Georgia,serif").style("pointer-events","none");
+    // Name label (outer)
+    nodeEl.append("text").text(d=>d.label.length>14?d.label.slice(0,13)+"…":d.label).attr("text-anchor","middle").attr("dy","2.9em").attr("font-size",11).attr("fill",C.text).attr("font-weight","500").attr("font-family","Georgia,serif").style("pointer-events","none");
+
+    // Click: first click selects node for linking, second click on different node creates link
+    nodeEl.on("click",(event,d)=>{
+      event.stopPropagation();
+      const linking=mapLinkingRef.current;
+      if(!linking){
+        // Select this node as link source
+        mapLinkingRef.current={id:d.id,label:d.label};
+        nodeEl.selectAll(".ring").attr("stroke","transparent");
+        nodeEl.filter(n=>n.id===d.id).select(".ring").attr("stroke","#7c3aed").attr("stroke-opacity",.8);
+        showToast("Clic en otro nodo para conectar, o vuelve a hacer clic aquí para cancelar");
+      } else if(linking.id===d.id){
+        // Cancel linking
+        mapLinkingRef.current=null;
+        nodeEl.selectAll(".ring").attr("stroke","transparent");
+        showToast("Conexión cancelada");
+      } else {
+        // Create link
+        const label=prompt(`Etiqueta de la relación entre "${linking.label}" y "${d.label}" (deja vacío si no hace falta):`)||"";
+        const already=mapLinks.some(l=>(l.source===linking.id&&l.target===d.id)||(l.source===d.id&&l.target===linking.id));
+        if(!already){
+          const newLinks=[...mapLinks,{id:"ml-"+Date.now(),source:linking.id,target:d.id,label}];
+          setMapLinks(newLinks);save("maplinks",newLinks,true);
+          showToast("✓ Conexión creada");
+        } else {
+          showToast("Ya existe una conexión entre esos nodos");
+        }
+        mapLinkingRef.current=null;
+        nodeEl.selectAll(".ring").attr("stroke","transparent");
+      }
+    });
+
+    // Double-click: delete node (custom nodes only)
+    nodeEl.on("dblclick",(event,d)=>{
+      event.stopPropagation();
+      if(d.group!=="custom"){ showToast("Para eliminar este elemento, bórralo desde su sección."); return; }
+      if(confirm(`¿Eliminar el nodo "${d.label}"?`)){
+        const newNodes=mapNodes.filter(n=>n.id!==d.id);
+        const newLinks=mapLinks.filter(l=>l.source!==d.id&&l.target!==d.id);
+        setMapNodes(newNodes);setMapLinks(newLinks);
+        save("mapnodes",newNodes,true);save("maplinks",newLinks,true);
+      }
+    });
+
+    // Hover tooltip
+    nodeEl.on("mouseover",(event,d)=>{
+      d3.select(event.currentTarget).select("circle:nth-child(2)").attr("fill",d=>(NODE_C[d.type]||"#6b7280")+"44");
+    }).on("mouseout",(event,d)=>{
+      d3.select(event.currentTarget).select("circle:nth-child(2)").attr("fill",d=>(NODE_C[d.type]||"#6b7280")+"22");
+    });
+
+    // Drag (with separate start/drag/end so it doesn't fire click after drag)
+    const drag=d3.drag()
+      .on("start",(event,d)=>{ if(!event.active)sim.alphaTarget(.3).restart(); d.fx=d.x;d.fy=d.y; })
+      .on("drag",(event,d)=>{ d.fx=event.x;d.fy=event.y; })
+      .on("end",(event,d)=>{ if(!event.active)sim.alphaTarget(0); d.fx=null;d.fy=null; });
+    nodeEl.call(drag);
+
+    // Click on empty space to cancel linking
+    svg.on("click",()=>{ mapLinkingRef.current=null; nodeEl.selectAll(".ring").attr("stroke","transparent"); });
+
+    sim.on("tick",()=>{
+      linkSel.select("line")
+        .attr("x1",d=>d.source.x).attr("y1",d=>d.source.y)
+        .attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+      linkSel.select("text")
+        .attr("x",d=>(d.source.x+d.target.x)/2)
+        .attr("y",d=>(d.source.y+d.target.y)/2-8);
+      nodeEl.attr("transform",d=>"translate("+d.x+","+d.y+")");
+    });
+    return()=>{ sim.stop(); mapLinkingRef.current=null; };
+  },[view,buildAllMapNodes,mapLinks,mapFilter]);
+
+  // ── Import ──
+  const readFileAsText=file=>new Promise((res,rej)=>{
+    if(file.name.endsWith(".docx")&&window.mammoth){
+      const reader=new FileReader();reader.onload=async e=>{try{const r=await window.mammoth.extractRawText({arrayBuffer:e.target.result});res(r.value);}catch(err){rej(err);}};reader.readAsArrayBuffer(file);
+    }else{const reader=new FileReader();reader.onload=e=>res(e.target.result);reader.onerror=()=>rej(new Error("Error: "+file.name));reader.readAsText(file,"utf-8");}
+  });
+  const handleImpFiles=async e=>{
+    const files=Array.from(e.target.files);const results=[];
+    for(const f of files){try{const text=await readFileAsText(f);results.push({name:f.name,text,ok:true});}catch{results.push({name:f.name,text:"",ok:false});}}
+    setImpFiles(results);e.target.value="";
+  };
+  const processImport=async()=>{
+    const combined=(impFiles.filter(f=>f.ok).map(f=>"### "+f.name+"\n"+f.text).join("\n\n")+(impText.trim()?"\n\n"+impText:"")).trim();
+    if(!combined){showToast("⚠ Añade archivos o texto.");return;}
+    setImpBusy(true);setImpStep(1);setImpError(null);
+    const sys="Responde ÚNICAMENTE con JSON (sin markdown, empieza con {).";
+    const prompt="Analiza y extrae:\n{\"idea\":\"\",\"synopsis\":\"\",\"characters\":[{\"name\":\"\",\"role\":\"protagonist|antagonist|secondary|mentor|other\",\"appearance\":\"\",\"fears\":\"\",\"secret\":\"\",\"ghost\":\"\",\"arcStart\":\"\",\"arcEnd\":\"\",\"arcHow\":\"\"}],\"codex\":[{\"name\":\"\",\"type\":\"personaje|lugar|objeto|mitología|otro\",\"desc\":\"\"}],\"lorebook\":[{\"keywords\":[\"\"],\"content\":\"\"}],\"worldData\":{\"genre\":\"\",\"magicRules\":\"\",\"geography\":\"\",\"society\":\"\",\"tone\":\"\"},\"structure\":{\"premise\":\"\",\"theme\":\"\",\"incitingIncident\":\"\",\"midpointTwist\":\"\",\"darkNight\":\"\",\"climax\":\"\",\"plotTwists\":\"\"},\"escaleta\":[{\"title\":\"\",\"summary\":\"\",\"goal\":\"\",\"conflict\":\"\",\"hook\":\"\"}],\"manuscript\":\"\"}\n\nCONTENIDO:\n"+combined.substring(0,10000);
+    try{
+      const raw=await AI([{role:"user",content:prompt}],sys,3000);
+      const fb=raw.indexOf("{");const lb=raw.lastIndexOf("}");
+      if(fb===-1||lb===-1) throw new Error("JSON no encontrado.");
+      const parsed=JSON.parse(raw.slice(fb,lb+1));
+      const sel={};
+      if(parsed.idea?.trim())sel.idea=true;if(parsed.synopsis?.trim())sel.synopsis=true;
+      if(parsed.manuscript?.trim())sel.manuscript=true;if(parsed.characters?.length)sel.characters=true;
+      if(parsed.codex?.length)sel.codex=true;if(parsed.lorebook?.length)sel.lorebook=true;
+      if(parsed.escaleta?.length)sel.escaleta=true;
+      if(Object.values(parsed.worldData||{}).some(v=>v?.trim()))sel.worldData=true;
+      if(["premise","theme","incitingIncident","midpointTwist","darkNight","climax","plotTwists"].some(k=>parsed.structure?.[k]?.trim()))sel.structure=true;
+      if(!Object.keys(sel).length){setImpError("No se encontró información reconocible.");setImpStep(3);}
+      else{setImpExtracted(parsed);setImpSel(sel);setImpStep(2);}
+    }catch(e){setImpError("Error: "+e.message);setImpStep(3);}
+    setImpBusy(false);
+  };
+  const applyImport=()=>{
+    const d=impExtracted;if(!d)return;
+    const nid=()=>Date.now().toString()+Math.random().toString(36).slice(2);
+    if(impSel.idea&&d.idea?.trim()){setIdea(d.idea);save("idea",d.idea);}
+    if(impSel.synopsis&&d.synopsis?.trim()){setSynopsis(d.synopsis);save("synopsis",d.synopsis);}
+    if(impSel.manuscript&&d.manuscript?.trim()){const m=manuscript?(manuscript+"\n\n---\n\n"+d.manuscript):d.manuscript;setManuscript(m);save("manuscript",m);}
+    if(impSel.characters&&d.characters?.length){const merged=[...characters,...d.characters.filter(nc=>!characters.some(ec=>ec.name===nc.name)).map(c=>({...c,id:nid()}))];setCharacters(merged);save("characters",merged);}
+    if(impSel.codex&&d.codex?.length){const merged=[...codex,...d.codex.filter(nc=>!codex.some(ec=>ec.name===nc.name)).map(c=>({...c,id:nid()}))];setCodex(merged);save("codex",merged);}
+    if(impSel.lorebook&&d.lorebook?.length){const merged=[...lorebook,...d.lorebook.map(e=>({...e,id:nid()}))];setLorebook(merged);save("lorebook",merged);}
+    if(impSel.worldData&&d.worldData){const merged={...worldData};Object.entries(d.worldData).forEach(([k,v])=>{if(v?.trim())merged[k]=worldData[k]?(worldData[k]+"\n"+v):v;});setWorldData(merged);save("world",merged);}
+    if(impSel.structure&&d.structure){const merged={...structure};Object.entries(d.structure).forEach(([k,v])=>{if(v?.trim())merged[k]=structure[k]?(structure[k]+"\n"+v):v;});setStructure(merged);save("structure",merged);}
+    if(impSel.escaleta&&d.escaleta?.length){const merged=[...escaleta,...d.escaleta.map(e=>({...e,id:nid()}))];setEscaleta(merged);save("escaleta",merged);}
+    setImpStep(0);setImpText("");setImpFiles([]);setImpExtracted(null);setImpSel({});
+    showToast("✓ Importación completada.");
+  };
+
+  // ── Publish ──
+  const getSourceText=()=>{if(pubSource==="manuscript")return manuscript;if(pubSource==="synopsis")return synopsis;if(pubSource==="prose")return prose;if(pubSource==="chapter"&&chapters[pubOpts.chapterSel])return chapters[pubOpts.chapterSel].title+"\n\n"+chapters[pubOpts.chapterSel].notes;return manuscript||prose||synopsis||"";};
+  const generatePublication=async()=>{
+    const fmt=PUB_FORMATS.find(f=>f.id===pubFormat);if(!fmt)return;
+    const src=getSourceText();if(!src.trim()){showToast("⚠ Sin contenido.");return;}
+    setPubBusy(true);setPubResult("");
+    try{const r=await AI([{role:"user",content:"Adapta al formato: "+fmt.label+"\nFORMATO: "+fmt.desc+"\nOPCIÓN: "+(pubOpts.selOpt||fmt.optList[0])+(pubOpts.tone?"\nTONO: "+pubOpts.tone:"")+"\n\nTEXTO:\n"+src.substring(0,8000)+"\n\nSolo el texto adaptado."}],"Editor profesional."+buildCtx(src),1000);setPubResult(r);}
+    catch(e){showToast("⚠ "+e.message);}
+    setPubBusy(false);
+  };
+  const copyPub=async()=>{try{await navigator.clipboard.writeText(pubResult);setPubCopied(true);setTimeout(()=>setPubCopied(false),2500);}catch{showToast("No se pudo copiar.");}};
+  const downloadPub=()=>{const fmt=PUB_FORMATS.find(f=>f.id===pubFormat);const b=new Blob([pubResult],{type:"text/plain;charset=utf-8"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=(activeBook?.title||"novela")+"-"+(fmt?.id||"export")+".txt";a.click();URL.revokeObjectURL(u);};
+  const exportProject=()=>{const b=new Blob([JSON.stringify({library},null,2)],{type:"application/json"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download="novelai-backup-"+new Date().toISOString().slice(0,10)+".json";a.click();URL.revokeObjectURL(u);};
+  const importProject=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=async ev=>{try{const d=JSON.parse(ev.target.result);if(d.library){setLibrary(d.library);await _saveLib(d.library);showToast("✓ Restaurado");setScreen("home");}else showToast("⚠ Archivo inválido.");}catch{showToast("⚠ Error al leer.");}};reader.readAsText(file);e.target.value="";};
+  const exportGoogleDocs=async()=>{const sects=[];if(activeBook)sects.push("OBRA: "+activeBook.title);if(idea)sects.push("IDEA\n"+idea);if(synopsis)sects.push("SINOPSIS\n"+synopsis);if(manuscript)sects.push("MANUSCRITO\n"+manuscript);const full="NOVEL AI STUDIO\n"+"═".repeat(50)+"\n\n"+sects.join("\n\n"+"═".repeat(50)+"\n\n");try{await navigator.clipboard.writeText(full);showToast("✓ Copiado. Abriendo Docs...");window.open("https://docs.new","_blank");}catch{window.open("https://docs.new","_blank");}};
+
+  const stepLbls=["Idea","Sinopsis","Esquema","Beats","Prosa"];
+  const btnLbl=["Generar Sinopsis →","Generar Esquema →","Generar Beats →","Generar Prosa →"][step]||"";
+  const senseC={vista:C.blue,olfato:C.green,tacto:C.accent,oído:C.yellow,gusto:C.red,metáfora:"#ec4899"};
+  const senseI={vista:"👁",olfato:"◎",tacto:"⌾",oído:"◑",gusto:"◐",metáfora:"✦"};
+  const allMapNodes=buildAllMapNodes();
+
+  const handleViewChange=(id)=>{setView(id);if(isMobile)setSidebarOpen(false);};
+
+  // ══════════════════════════════
+  if(!authReady) return(
+    <div style={{width:"100vw",height:"100vh",background:"#0c0a14",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:28,fontFamily:"Georgia,serif",color:"#fdf6e3",letterSpacing:"0.1em"}}>Novel<span style={{color:"#a78bfa"}}>AI</span></div>
+        <div style={{fontSize:10,color:"rgba(167,139,250,0.4)",letterSpacing:"0.4em",textTransform:"uppercase",fontFamily:"Georgia,serif",marginTop:6,animation:"lampFlicker 2s infinite"}}>cargando...</div>
+      </div>
+    </div>
+  );
+
+  if(screen==="login") return <LoginScreen/>;
+  if(screen==="setup") return <ApiKeySetup onSave={handleSaveApiKey}/>;
+
+  if(screen==="home") return(
+    <>
+      <DeskScene library={library} user={user}
+        onNewBook={()=>setNewBookType("new")} onConnectedBook={()=>setNewBookType("connected")}
+        onOpenLibrary={()=>setShowLibrary(true)} onSettings={()=>setShowSettings(true)}
+        onOpenRecent={(book,gotoView)=>{if(book)openBook(book,gotoView);else{const r=[...library].sort((a,b)=>new Date(b.lastEdited||0)-new Date(a.lastEdited||0))[0];if(r)openBook(r,gotoView);}}}/>
+      {showLibrary&&<LibraryPanel library={library} onOpen={openBook} onDelete={deleteBook} onClose={()=>setShowLibrary(false)}/>}
+      {newBookType&&<NewBookModal type={newBookType} library={library} onConfirm={createBook} onClose={()=>setNewBookType(null)}/>}
+      {showSettings&&<SettingsModal user={user} currentKey={apiKey} onSave={handleSaveApiKey} onClose={()=>setShowSettings(false)}/>}
+      {toast&&<div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#7c3aed",color:"#fff",padding:"12px 20px",borderRadius:999,fontSize:13,fontFamily:"Georgia,serif",fontWeight:600,zIndex:2000,whiteSpace:"nowrap"}}>{toast}</div>}
+    </>
+  );
+
+  // ══════════════════════════════
+  // APP SCREEN
+  // ══════════════════════════════
+  const mainPad = view==="mapa" ? {} : {padding: isMobile ? "60px 14px 80px" : "36px 48px"};
+
+  return(
+    <div style={{display:"flex",height:"100vh",background:C.bg,overflow:"hidden",position:"relative"}}>
+
+      {/* ── Mobile overlay ── */}
+      {isMobile&&sidebarOpen&&(
+        <div onClick={()=>setSidebarOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:299,backdropFilter:"blur(2px)"}}/>
+      )}
+
+      {/* ── MOBILE TOP BAR ── */}
+      {isMobile&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,height:52,background:C.surface,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",zIndex:200,boxShadow:sh}}>
+          <button onClick={()=>setSidebarOpen(s=>!s)} style={{background:"none",border:"none",color:C.text,fontSize:20,cursor:"pointer",padding:6,lineHeight:1}}>☰</button>
+          <div style={{flex:1,textAlign:"center",overflow:"hidden",padding:"0 8px"}}>
+            <div style={{fontSize:13,fontFamily:"Georgia,serif",fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{activeBook?.title||"NovelAI Studio"}</div>
+          </div>
+          <button onClick={()=>setScreen("home")} style={{background:"none",border:"none",color:C.light,fontSize:18,cursor:"pointer",padding:6}}>🏠</button>
+        </div>
+      )}
+
+      {/* ── SIDEBAR ── */}
+      <div className={`app-sidebar${isMobile&&sidebarOpen?" open":""}`}
+        style={{width:220,background:C.surface,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",flexShrink:0,height:"100%",overflowY:"auto"}}>
+        {/* Logo + book title */}
+        <div style={{padding:"16px 18px 14px",borderBottom:`1px solid ${C.borderL}`,cursor:"pointer"}} onClick={()=>{setScreen("home");setSidebarOpen(false);}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+            <svg width="16" height="16" viewBox="0 0 32 32" fill="none" style={{flexShrink:0}}>
+              <line x1="16" y1="2" x2="16" y2="30" stroke={C.accent} strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="2" y1="16" x2="30" y2="16" stroke={C.accent} strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="5" y1="5" x2="27" y2="27" stroke={C.accent} strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="27" y1="5" x2="5" y2="27" stroke={C.accent} strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+            <span style={{fontSize:13,fontFamily:"Georgia,serif",color:C.text,fontWeight:600,letterSpacing:"-0.01em"}}>NovelAI Studio</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:7,padding:"7px 10px",background:C.bg,borderRadius:8}}>
+            <div style={{width:8,height:8,borderRadius:2,background:activeBook?.color||C.accent,flexShrink:0}}/>
+            <div style={{fontSize:12,fontFamily:"Georgia,serif",color:C.text,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{activeBook?.title||"Sin título"}</div>
+          </div>
+          {activeBook?.type==="saga"&&<div style={{fontSize:10,color:C.light,fontFamily:"Georgia,serif",marginTop:5,paddingLeft:2}}>∞ {activeBook.sagaName} · libro #{activeBook.sagaOrder}</div>}
+        </div>
+        {/* Sync strip */}
+        <div style={{padding:"5px 16px",borderBottom:`1px solid ${C.borderL}`,display:"flex",alignItems:"center",gap:6}}>
+          <div style={{width:6,height:6,borderRadius:999,background:{synced:C.green,syncing:C.yellow,offline:C.red}[syncStatus],flexShrink:0}}/>
+          <span style={{fontSize:10,fontFamily:"Georgia,serif",color:{synced:C.green,syncing:C.yellow,offline:C.red}[syncStatus],fontWeight:500}}>
+            {{synced:"Guardado",syncing:"Guardando...",offline:"Sin conexión"}[syncStatus]}
+            {syncStatus==="synced"&&savedAt&&<span style={{fontWeight:400,color:C.light}}> · {new Date(savedAt).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</span>}
+          </span>
+        </div>
+        {/* Nav */}
+        <div style={{flex:1,overflowY:"auto",padding:"10px 8px 8px"}}>
+          {NAV.map((g,gi)=>(
+            <div key={g.group} style={{marginBottom:gi<NAV.length-1?18:0}}>
+              <div style={{fontSize:10,fontWeight:700,color:C.light,letterSpacing:"0.1em",textTransform:"uppercase",padding:"2px 12px 7px",fontFamily:"Georgia,serif"}}>{g.group}</div>
+              {g.items.map(item=>{
+                const active=view===item.id;
+                return(
+                  <button key={item.id} onClick={()=>handleViewChange(item.id)}
+                    style={{display:"flex",alignItems:"center",gap:11,padding:"9px 12px",width:"100%",background:active?C.aLight:"transparent",border:"none",borderRadius:8,color:active?C.accent:C.mid,cursor:"pointer",fontSize:13,textAlign:"left",fontWeight:active?600:400,fontFamily:"Georgia,serif",WebkitTapHighlightColor:"transparent",transition:"background .1s,color .1s"}}>
+                    <span style={{fontSize:15,width:20,textAlign:"center",flexShrink:0,opacity:active?1:.7}}>{item.icon}</span>
+                    <span style={{flex:1}}>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+        {/* Footer */}
+        <div style={{padding:"8px 8px 6px",borderTop:`1px solid ${C.borderL}`}}>
+          <div style={{display:"flex",gap:5,marginBottom:6}}>
+            <button onClick={exportProject} style={{flex:1,padding:"6px 0",borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.mid,cursor:"pointer",fontSize:11,fontFamily:"Georgia,serif"}}>⬇ Export</button>
+            <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"6px 0",borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.mid,cursor:"pointer",fontSize:11,fontFamily:"Georgia,serif"}}>
+              ⬆ Import<input type="file" accept=".json" onChange={importProject} style={{display:"none"}}/>
+            </label>
+          </div>
+          {/* Google Docs */}
+          <div style={{marginBottom:6,padding:"8px 10px",borderRadius:8,border:`1px solid ${linkedDocId?"#0f9d5830":"rgba(15,157,88,0.18)"}`,background:linkedDocId?"rgba(15,157,88,0.04)":"transparent"}}>
+            {!linkedDocId ? (
+              <button onClick={handleLinkGoogleDoc} disabled={docSyncStatus==="syncing"}
+                style={{width:"100%",background:"none",border:"none",cursor:docSyncStatus==="syncing"?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6,padding:0,color:"#0f9d58",fontFamily:"Georgia,serif",fontSize:11,fontWeight:600,opacity:docSyncStatus==="syncing"?.6:1}}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#0f9d58" strokeWidth="1.5"/><polyline points="14,2 14,8 20,8" stroke="#0f9d58" strokeWidth="1.5"/></svg>
+                {docSyncStatus==="syncing"?"Creando Doc...":"Vincular Google Doc"}
+              </button>
+            ) : (
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <span style={{fontSize:10,color:"#0f9d58",fontFamily:"Georgia,serif",fontWeight:600}}>
+                    {{idle:"📄 Vinculado",syncing:"📄 Sync...",synced:"📄 Sync ✓",error:"📄 Error"}[docSyncStatus]}
+                  </span>
+                  <button onClick={handleUnlinkDoc} style={{background:"none",border:"none",color:C.light,cursor:"pointer",fontSize:11,padding:0}}>✕</button>
+                </div>
+                <div style={{display:"flex",gap:4}}>
+                  <button onClick={handlePushToDoc} style={{flex:1,padding:"4px 0",borderRadius:6,border:"1px solid rgba(15,157,88,0.22)",background:"rgba(15,157,88,0.07)",color:"#0a7a45",cursor:"pointer",fontSize:10,fontFamily:"Georgia,serif",fontWeight:600}}>↑ Push</button>
+                  <button onClick={handlePullFromDoc} style={{flex:1,padding:"4px 0",borderRadius:6,border:"1px solid rgba(15,157,88,0.22)",background:"rgba(15,157,88,0.07)",color:"#0a7a45",cursor:"pointer",fontSize:10,fontFamily:"Georgia,serif",fontWeight:600}}>↓ Pull</button>
+                  <button onClick={()=>window.open(`https://docs.google.com/document/d/${linkedDocId}/edit`,"_blank")} style={{flex:1,padding:"4px 0",borderRadius:6,border:"1px solid rgba(15,157,88,0.22)",background:"rgba(15,157,88,0.07)",color:"#0a7a45",cursor:"pointer",fontSize:10,fontFamily:"Georgia,serif",fontWeight:600}}>↗</button>
+                </div>
+              </div>
+            )}
+          </div>
+          <button onClick={()=>{setShowSettings(true);setSidebarOpen(false);}} style={{width:"100%",padding:"6px 0",borderRadius:8,border:`1px solid ${C.border}`,background:C.bg,color:C.mid,cursor:"pointer",fontSize:11,fontFamily:"Georgia,serif",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>⚙ Ajustes</button>
+        </div>
+        {/* User + stats */}
+        <div style={{padding:"8px 12px 10px",borderTop:`1px solid ${C.borderL}`}}>
+          {user&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,cursor:"pointer"}} onClick={()=>{setShowSettings(true);setSidebarOpen(false);}}>
+            {user.photoURL?<img src={user.photoURL} style={{width:22,height:22,borderRadius:"50%"}} alt=""/>:<div style={{width:22,height:22,borderRadius:"50%",background:C.accent,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:10,flexShrink:0}}>{user.displayName?.[0]||"U"}</div>}
+            <span style={{fontSize:11,color:C.mid,fontFamily:"Georgia,serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.displayName}</span>
+          </div>}
+          <div style={{fontSize:10,color:C.light,fontFamily:"Georgia,serif",lineHeight:1.6}}>
+            {characters.length} personajes · {codex.length} codex<br/>
+            {manuscript.split(/\s+/).filter(Boolean).length} palabras
+          </div>
+        </div>
+      </div>
+
+
+      {/* ── MAIN CONTENT ── */}
+      <div className={view==="mapa"?"app-main-map":"app-main"} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",...mainPad}}>
+
+        {/* STORY ENGINE */}
+        {view==="engine"&&(
+          <div style={{maxWidth:760}}>
+            <SecHdr title="Story Engine" sub="De una chispa a miles de palabras."/>
+            {/* Step progress */}
+            <div style={{display:"flex",gap:0,marginBottom:32,position:"relative"}}>
+              {stepLbls.map((s,i)=>(
+                <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",position:"relative"}}>
+                  {i>0&&<div style={{position:"absolute",left:"-50%",right:"50%",top:14,height:2,background:i<=step?C.accent:C.border,zIndex:0}}/>}
+                  <div style={{width:28,height:28,borderRadius:999,background:i<step?C.accent:i===step?C.surface:C.bg,border:`2px solid ${i<=step?C.accent:C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:i<step?"#fff":i===step?C.accent:C.light,zIndex:1,boxShadow:i===step?"0 0 0 4px "+C.aLight:"none"}}>{i<step?"✓":i+1}</div>
+                  <div style={{marginTop:6,fontSize:isMobile?9:11,color:i<=step?C.accent:C.light,fontWeight:i===step?600:400,fontFamily:"Georgia,serif"}}>{s}</div>
+                </div>
+              ))}
+            </div>
+            {[
+              {l:"Tu Idea",v:idea,s:v=>{setIdea(v);save("idea",v);},ph:"Una maga que perdió sus poderes...",h:100,show:true},
+              {l:"Sinopsis",v:synopsis,s:v=>{setSynopsis(v);save("synopsis",v);},h:150,show:step>=1},
+              {l:"Esquema de Capítulos",v:outline,s:v=>{setOutline(v);save("outline",v);},h:200,show:step>=2},
+              {l:"Story Beats",v:beats,s:v=>{setBeats(v);save("beats",v);},h:180,show:step>=3},
+              {l:"Prosa Generada",v:prose,s:v=>{setProse(v);save("prose",v);},h:320,show:step>=4,ip:true},
+            ].map((f,i)=>f.show&&(
+              <div key={i} style={{...card,marginBottom:16}}>
+                <label style={{...fLb,marginBottom:10}}>{f.l}</label>
+                <textarea value={f.v} onChange={e=>f.s(e.target.value)} placeholder={f.ph||""} style={{...fIn,minHeight:f.h,resize:"vertical",lineHeight:1.8,fontSize:f.ip?16:14}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+                {f.ip&&<div style={{marginTop:10}}><button onClick={()=>{const m=manuscript+(manuscript?"\n\n":"")+prose;setManuscript(m);save("manuscript",m);setView("manuscript");}} style={ghostBtn}>Enviar al Manuscrito →</button></div>}
+              </div>
+            ))}
+            {step<4&&(
+              <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginTop:4}}>
+                <button onClick={genEngine} disabled={busy||!idea.trim()} style={primBtn(busy||!idea.trim())}>{busy?"⏳ Generando...":"✦ "+btnLbl}</button>
+                {step>0&&<button onClick={()=>{setStep(0);save("step",0);setSynopsis("");setOutline("");setBeats("");setProse("");}} style={ghostBtn}>↺ Reiniciar</button>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* MANUSCRITO */}
+        {view==="manuscript"&&(
+          <div style={{maxWidth:860}}>
+            {/* ── Header with mode toggle ── */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
+              <div>
+                <h2 style={{margin:0,fontSize:24,fontFamily:"Georgia,serif",color:C.text,fontWeight:400}}>Manuscrito</h2>
+                <p style={{margin:"4px 0 0",color:C.mid,fontSize:13,fontFamily:"Georgia,serif"}}>
+                  {isMobile?"Escribe. Se guarda solo.":"Selecciona texto para herramientas de IA · IA puede escribir capítulos automáticamente"}
+                </p>
+              </div>
+              {/* Mode toggle */}
+              <div style={{display:"flex",gap:5,background:C.bg,borderRadius:999,padding:3,border:`1px solid ${C.border}`}}>
+                <button onClick={()=>setMsMode("full")} style={{padding:"6px 16px",borderRadius:999,border:"none",background:msMode==="full"?C.surface:"transparent",color:msMode==="full"?C.accent:C.mid,cursor:"pointer",fontSize:12,fontFamily:"Georgia,serif",fontWeight:msMode==="full"?600:400,boxShadow:msMode==="full"?sh:"none",transition:"all .15s"}}>
+                  📄 Completo
+                </button>
+                <button onClick={()=>setMsMode("chapter")} style={{padding:"6px 16px",borderRadius:999,border:"none",background:msMode==="chapter"?C.surface:"transparent",color:msMode==="chapter"?C.accent:C.mid,cursor:"pointer",fontSize:12,fontFamily:"Georgia,serif",fontWeight:msMode==="chapter"?600:400,boxShadow:msMode==="chapter"?sh:"none",transition:"all .15s"}}>
+                  📑 Por capítulos
+                </button>
+              </div>
+            </div>
+
+            {/* ── CHAPTER MODE ── */}
+            {msMode==="chapter"&&(
+              <div>
+                {chapters.length===0?(
+                  <div style={{...card,textAlign:"center",padding:48,marginBottom:20}}>
+                    <div style={{fontSize:32,marginBottom:12}}>📑</div>
+                    <div style={{color:C.mid,fontFamily:"Georgia,serif",marginBottom:16}}>No hay capítulos definidos todavía.</div>
+                    <button onClick={()=>setView("planning")} style={{...ghostBtn,fontSize:13}}>→ Ir al Tablero a crear capítulos</button>
+                  </div>
+                ):(
+                  <>
+                    {/* Chapter tabs */}
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+                      {chapters.map((ch,i)=>{
+                        const sc={done:C.green,wip:C.yellow,draft:C.light};
+                        const isActive=msChapterIdx===i;
+                        return(
+                          <button key={ch.id} onClick={()=>setMsChapterIdx(i)} style={{padding:"7px 14px",borderRadius:10,border:`1.5px solid ${isActive?C.accent:C.border}`,background:isActive?C.aLight:C.surface,color:isActive?C.accent:C.mid,cursor:"pointer",fontSize:12,fontFamily:"Georgia,serif",fontWeight:isActive?600:400,display:"flex",alignItems:"center",gap:6,transition:"all .15s"}}>
+                            <span style={{width:7,height:7,borderRadius:"50%",background:sc[ch.status],flexShrink:0}}/>
+                            <span>{String(i+1).padStart(2,"0")} {ch.title.length>18?ch.title.slice(0,17)+"…":ch.title}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Active chapter panel */}
+                    {chapters[msChapterIdx]&&(()=>{
+                      const ch=chapters[msChapterIdx];
+                      const sc={done:C.green,wip:C.yellow,draft:C.light};
+                      // Extract existing text for this chapter
+                      const chMarker=`=== CAPÍTULO ${msChapterIdx+1}:`;
+                      const startIdx=manuscript.indexOf(chMarker);
+                      const endIdx=startIdx!==-1?manuscript.indexOf("\n===",startIdx+10):-1;
+                      const chText=startIdx!==-1?(endIdx!==-1?manuscript.slice(startIdx,endIdx):manuscript.slice(startIdx)):"";
+                      const chWords=chText.split(/\s+/).filter(Boolean).length;
+
+                      return(
+                        <div style={{...card,marginBottom:16,borderLeft:`4px solid ${sc[ch.status]}`}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,gap:12,flexWrap:"wrap"}}>
+                            <div>
+                              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                                <span style={{fontSize:12,fontWeight:700,color:C.accent,fontFamily:"Georgia,serif"}}>CAP. {String(msChapterIdx+1).padStart(2,"0")}</span>
+                                <span style={{padding:"2px 10px",borderRadius:999,background:sc[ch.status]+"18",border:`1px solid ${sc[ch.status]}33`,color:sc[ch.status],fontSize:10,fontFamily:"Georgia,serif",fontWeight:600}}>
+                                  {{done:"✓ Listo",wip:"✏ En progreso",draft:"○ Borrador"}[ch.status]}
+                                </span>
+                                {chWords>0&&<span style={{fontSize:11,color:C.light,fontFamily:"Georgia,serif"}}>{chWords} palabras</span>}
+                              </div>
+                              <h3 style={{margin:0,fontSize:18,fontFamily:"Georgia,serif",fontWeight:400,color:C.text}}>{ch.title}</h3>
+                              {ch.notes&&<p style={{margin:"6px 0 0",fontSize:13,color:C.mid,fontFamily:"Georgia,serif",lineHeight:1.5}}>{ch.notes}</p>}
+                            </div>
+                            {/* AI Write button */}
+                            <button onClick={()=>writeChapterWithAI(msChapterIdx)} disabled={writingChapter||busy}
+                              style={{...primBtn(writingChapter||busy),padding:"10px 20px",fontSize:13,flexShrink:0,gap:8,whiteSpace:"nowrap"}}>
+                              {writingChapter?(
+                                <><span style={{width:14,height:14,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"#fff",borderRadius:"50%",display:"inline-block",animation:"spin .8s linear infinite"}}/>Escribiendo...</>
+                              ):(
+                                <><span>✦</span>{chText?"Reescribir capítulo":"Escribir capítulo"}</>
+                              )}
+                            </button>
+                          </div>
+
+                          {/* Preview of written text */}
+                          {chText&&(
+                            <div style={{padding:"14px 18px",background:C.bg,borderRadius:10,marginBottom:12,maxHeight:200,overflowY:"auto",fontSize:14,lineHeight:1.8,fontFamily:"Georgia,serif",color:C.mid,borderLeft:`2px solid ${C.accent}33`,position:"relative"}}>
+                              <div style={{fontSize:10,fontWeight:700,color:C.light,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,fontFamily:"Georgia,serif"}}>Vista previa</div>
+                              {chText.replace(chMarker,"").replace(/^[^\n]+\n/,"").trim().slice(0,600)}{chText.length>600?"…":""}
+                            </div>
+                          )}
+
+                          {/* Quick nav */}
+                          <div style={{display:"flex",gap:8,justifyContent:"space-between",alignItems:"center"}}>
+                            <div style={{display:"flex",gap:6}}>
+                              {msChapterIdx>0&&<button onClick={()=>setMsChapterIdx(i=>i-1)} style={{...ghostBtn,padding:"5px 12px",fontSize:12}}>← Anterior</button>}
+                              {msChapterIdx<chapters.length-1&&<button onClick={()=>setMsChapterIdx(i=>i+1)} style={{...ghostBtn,padding:"5px 12px",fontSize:12}}>Siguiente →</button>}
+                            </div>
+                            <button onClick={()=>setMsMode("full")} style={{...ghostBtn,padding:"5px 12px",fontSize:12}}>Ver manuscrito completo →</button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Write all chapters button */}
+                    {chapters.length>1&&(
+                      <div style={{...card,padding:"14px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",borderStyle:"dashed"}}>
+                        <div>
+                          <div style={{fontSize:13,fontWeight:600,color:C.text,fontFamily:"Georgia,serif",marginBottom:2}}>Escribir todos los capítulos en secuencia</div>
+                          <div style={{fontSize:12,color:C.mid,fontFamily:"Georgia,serif"}}>La IA escribirá uno por uno usando todo el contexto. Puede tardar varios minutos.</div>
+                        </div>
+                        <button onClick={async()=>{
+                          for(let i=0;i<chapters.length;i++){
+                            setMsChapterIdx(i);
+                            await writeChapterWithAI(i);
+                            await new Promise(r=>setTimeout(r,1200));
+                          }
+                          showToast("✓ Todos los capítulos escritos");
+                        }} disabled={writingChapter||busy} style={{...ghostBtn,borderColor:C.accent+"55",color:C.accent,padding:"9px 18px",fontSize:13,fontWeight:600,flexShrink:0}}>
+                          ✦ Escribir todos ({chapters.length})
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* ── AI TOOLS BAR (shown when text selected) ── */}
+            {showTools&&(
+              <div style={{...card,marginBottom:16,padding:"14px 16px",borderColor:C.aMid+"55",overflowX:"auto"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                  <span style={{fontSize:12,color:C.mid,fontStyle:"italic",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>«{selText.substring(0,40)}{selText.length>40?"…":""}»</span>
+                  <button onClick={()=>setShowTools(false)} style={{background:"none",border:"none",color:C.light,cursor:"pointer",fontSize:16,flexShrink:0,padding:4}}>✕</button>
+                </div>
+                {[
+                  {group:"Sensorial",tools:[{id:"describe",label:"🌿 Describir",fn:openDescribe}]},
+                  {group:"Estilo",tools:TOOLS_MS.filter(t=>t.group==="estilo").map(t=>({...t,fn:()=>openRewrite(t.id)}))},
+                  {group:"Drama",tools:TOOLS_MS.filter(t=>t.group==="drama").map(t=>({...t,fn:()=>openRewrite(t.id)}))},
+                  {group:"Narrativa",tools:TOOLS_MS.filter(t=>t.group==="narrative").map(t=>({...t,fn:()=>openRewrite(t.id)}))},
+                ].map(({group,tools})=>(
+                  <div key={group} style={{display:"flex",gap:5,alignItems:"center",flexWrap:"wrap",marginBottom:6}}>
+                    <span style={{fontSize:9,fontWeight:700,color:C.light,letterSpacing:"0.1em",textTransform:"uppercase",minWidth:50,flexShrink:0,fontFamily:"Georgia,serif"}}>{group}</span>
+                    {tools.map(t=><button key={t.id||t.label} onClick={t.fn} style={{...pill(false,true),borderColor:C.accent+"33",color:C.accent,fontSize:11}}>{t.label}</button>)}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── FULL MANUSCRIPT TEXTAREA ── */}
+            <div style={{position:"relative"}}>
+              {msMode==="chapter"&&<div style={{fontSize:11,color:C.light,fontFamily:"Georgia,serif",marginBottom:8,fontStyle:"italic"}}>Manuscrito completo · edita directamente o usa el modo por capítulos para que la IA escriba cada uno</div>}
+              <textarea ref={taRef} value={manuscript}
+                onChange={e=>{
+                  const v=e.target.value; setManuscript(v);
+                  debouncedSaveMs(activeBook?.id,v);
+                  setSyncStatus("syncing");
+                  if(linkedDocId){ setDocSyncStatus("syncing"); debouncedDocSync(linkedDocId,v); }
+                }}
+                onMouseUp={handleSel} onKeyUp={handleSel}
+                placeholder={"Escribe aquí tu novela…\n\nO usa el modo Por Capítulos ↑ para que la IA escriba cada capítulo automáticamente.\n\n☁ Se guarda en la nube automáticamente."}
+                className="manuscript-area"
+                style={{width:"100%",minHeight:isMobile?420:540,background:C.surface,border:`1.5px solid ${C.border}`,borderRadius:14,padding:isMobile?"20px 18px":"36px 48px",color:C.text,fontSize:isMobile?16:18,lineHeight:2.0,resize:"vertical",boxSizing:"border-box",fontFamily:"Georgia,serif",outline:"none",boxShadow:sh,WebkitOverflowScrolling:"touch"}}
+                onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:8,fontSize:12,color:C.light,fontFamily:"Georgia,serif",flexWrap:"wrap",gap:4}}>
+              <span>{manuscript.split(/\s+/).filter(Boolean).length} palabras · {chapters.length>0?`${chapters.length} capítulos`:""}</span>
+              <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                <span style={{color:{synced:C.green,syncing:C.yellow,offline:C.red}[syncStatus]||C.light,fontWeight:600}}>
+                  {{synced:"☁ Firebase",syncing:"↑ Firebase...",offline:"◌ Sin red"}[syncStatus]}
+                </span>
+                {linkedDocId&&<span style={{color:{idle:C.light,syncing:C.yellow,synced:"#0f9d58",error:C.red}[docSyncStatus],fontWeight:600}}>
+                  {{idle:"📄 Doc",syncing:"📄 Docs...",synced:"📄 Docs ✓",error:"📄 Docs ✗"}[docSyncStatus]}
+                </span>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* BRAINSTORM */}
+        {view==="brainstorm"&&(
+          <div style={{maxWidth:680}}>
+            <SecHdr title="Brainstorm" sub="Genera ideas infinitas. Guarda las mejores ⭐"/>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:20}}>
+              {["nombres","giros","objetos mágicos","locaciones","facciones","conflictos","poderes","profecías"].map(cat=>(
+                <button key={cat} onClick={()=>setBsCat(cat)} style={pill(bsCat===cat,true)}>{cat}</button>
+              ))}
+            </div>
+            <div style={{...card,marginBottom:16}}>
+              <Fld label="Contexto (opcional)" value={bsCtx} onChange={setBsCtx} ph="fantasía oscura..." ta h={64}/>
+              <button onClick={runBrainstorm} disabled={busy} style={primBtn(busy)}>{busy?"⏳ Generando...":"✦ Generar 10 Ideas"}</button>
+            </div>
+            {bsResults.length>0&&<div style={{...card,marginBottom:20,padding:0,overflow:"hidden"}}>
+              {bsResults.map((r,i)=>(
+                <div key={i} style={{padding:"13px 18px",borderBottom:i<bsResults.length-1?"1px solid "+C.borderL:"none",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:14,lineHeight:1.5,color:C.text,fontFamily:"Georgia,serif"}}>{r}</span>
+                  <button onClick={()=>{const n=bsFavs.includes(r)?bsFavs.filter(x=>x!==r):[...bsFavs,r];setBsFavs(n);save("bsfavs",n);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:17,opacity:bsFavs.includes(r)?1:.2,flexShrink:0}}>⭐</button>
+                </div>
+              ))}
+            </div>}
+            {bsFavs.length>0&&<div>
+              <div style={{fontSize:11,fontWeight:700,color:C.light,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,fontFamily:"Georgia,serif"}}>⭐ Favoritos</div>
+              <div style={{...card,padding:0,overflow:"hidden"}}>
+                {bsFavs.map((r,i)=>(
+                  <div key={i} style={{padding:"11px 18px",borderBottom:i<bsFavs.length-1?"1px solid "+C.borderL:"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontSize:13,color:C.mid,fontFamily:"Georgia,serif"}}>{r}</span>
+                    <button onClick={()=>{const n=bsFavs.filter(x=>x!==r);setBsFavs(n);save("bsfavs",n);}} style={{background:"none",border:"none",color:C.light,cursor:"pointer",fontSize:14}}>✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>}
+          </div>
+        )}
+
+        {/* MAPA */}
+        {view==="mapa"&&(
+          <div style={{display:"flex",flexDirection:"column",height:"100vh"}}>
+            <div style={{padding:isMobile?"62px 12px 8px":"12px 20px",background:C.surface,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",flexShrink:0}}>
+              <span style={{fontSize:15,fontFamily:"Georgia,serif",color:C.text,fontWeight:400,marginRight:4}}>Mapa</span>
+              <div style={{display:"flex",gap:5,flex:1,flexWrap:"wrap"}}>
+                {[["all","Todos"],["cast","Personajes"],["world","Mundo"],["plot","Trama"]].map(([f,l])=>(
+                  <button key={f} onClick={()=>setMapFilter(f)} style={pill(mapFilter===f,true)}>{l}</button>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:5}}>
+                <button onClick={()=>setAddNodeForm({label:"",type:"custom"})} style={{...ghostBtn,fontSize:11,padding:"6px 12px"}} title="Añadir nodo personalizado">＋ Nodo</button>
+                <button onClick={()=>window.__mapZoom&&window.__mapZoom()} style={{...ghostBtn,fontSize:11,padding:"6px 12px"}} title="Centrar vista">⊙</button>
+              </div>
+            </div>
+            {/* Instructions bar */}
+            <div style={{padding:"5px 20px",background:"rgba(124,58,237,0.05)",borderBottom:`1px solid ${C.borderL}`,fontSize:11,color:C.light,fontFamily:"Georgia,serif",display:"flex",gap:20,flexWrap:"wrap"}}>
+              <span>🖱 <strong style={{color:C.mid}}>Clic</strong> en un nodo para conectar con otro</span>
+              <span>↔ <strong style={{color:C.mid}}>2º clic</strong> en otro nodo para crear la conexión</span>
+              <span>⇄ <strong style={{color:C.mid}}>Arrastrar</strong> para mover · <strong style={{color:C.mid}}>Doble clic</strong> para eliminar</span>
+            </div>
+            <div style={{flex:1,position:"relative",background:C.bg,overflow:"hidden"}}>
+              <svg ref={svgRef} style={{width:"100%",height:"100%"}}/>
+              {allMapNodes.length===0&&<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",color:C.light,fontFamily:"Georgia,serif",pointerEvents:"none",padding:20,textAlign:"center"}}><div style={{fontSize:40,marginBottom:12}}>⬡</div><div style={{marginBottom:6}}>El mapa está vacío.</div><div style={{fontSize:13}}>Añade personajes, codex o escaleta y aparecerán aquí automáticamente.</div></div>}
+            </div>
+            {/* Connections list */}
+            {mapLinks.length>0&&<div style={{background:C.surface,borderTop:`1px solid ${C.border}`,padding:"8px 20px",maxHeight:90,overflowY:"auto",flexShrink:0}}>
+              <div style={{fontSize:10,fontWeight:700,color:C.light,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6,fontFamily:"Georgia,serif"}}>Conexiones ({mapLinks.length}) — doble clic en una línea para eliminarla</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {mapLinks.map(l=>{
+                  const sn=allMapNodes.find(n=>n.id===l.source)||{label:l.source};
+                  const tn=allMapNodes.find(n=>n.id===l.target)||{label:l.target};
+                  return <div key={l.id} style={{display:"inline-flex",alignItems:"center",gap:5,padding:"3px 10px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,fontSize:11,fontFamily:"Georgia,serif",color:C.mid}}>
+                    <span style={{color:C.text,fontWeight:500}}>{sn.label}</span>
+                    {l.label&&<span style={{color:C.accent,fontSize:10}}>— {l.label} —</span>}
+                    {!l.label&&<span style={{color:C.light}}>→</span>}
+                    <span style={{color:C.text,fontWeight:500}}>{tn.label}</span>
+                    <button onClick={()=>{const n=mapLinks.filter(x=>x.id!==l.id);setMapLinks(n);save("maplinks",n,true);}} style={{background:"none",border:"none",color:C.light,cursor:"pointer",fontSize:12,padding:"0 2px",lineHeight:1}}>✕</button>
+                  </div>;
+                })}
+              </div>
+            </div>}
+          </div>
+        )}
+
+        {/* ARCOS ARGUMENTALES */}
+        {view==="arcos"&&(
+          <div style={{maxWidth:860}}>
+            <SecHdr title="Arcos Argumentales" sub="Visualiza y diseña la evolución de cada trama a lo largo de la historia."
+              action={<button onClick={()=>setArcosForm({...EAR,id:null,characters:[]})} style={{...primBtn(false),padding:"9px 18px",fontSize:13}}>+ Nuevo Arco</button>}/>
+
+            {arcos.length===0&&<div style={{...card,textAlign:"center",padding:56,color:C.light,fontFamily:"Georgia,serif"}}>
+              <div style={{fontSize:36,marginBottom:12}}>◐</div>
+              <div style={{fontSize:15,marginBottom:6}}>Sin arcos argumentales.</div>
+              <div style={{fontSize:13}}>Crea el arco principal de tu novela, los secundarios de tus personajes, o las subtramas.</div>
+            </div>}
+
+            <div style={{display:"flex",flexDirection:"column",gap:20}}>
+              {arcos.map(arc=>{
+                const arcColor={principal:C.accent,secundario:C.blue,personaje:C.green,subtrama:"#f59e0b",romance:"#ec4899"}[arc.type]||C.accent;
+                const typeLabel={principal:"Principal",secundario:"Secundario",personaje:"Personaje",subtrama:"Subtrama",romance:"Romance"}[arc.type]||arc.type;
+                return(
+                  <div key={arc.id} style={{...card,borderLeft:`4px solid ${arcColor}`,padding:"20px 24px"}}>
+                    {/* Header */}
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:12,flexWrap:"wrap"}}>
+                      <div>
+                        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                          <span style={{padding:"3px 12px",borderRadius:999,background:arcColor+"18",border:`1px solid ${arcColor}33`,color:arcColor,fontSize:11,fontFamily:"Georgia,serif",fontWeight:600}}>{typeLabel}</span>
+                          {arc.characters?.length>0&&<span style={{fontSize:11,color:C.mid,fontFamily:"Georgia,serif"}}>{arc.characters.join(", ")}</span>}
+                        </div>
+                        <h3 style={{margin:0,fontSize:18,fontFamily:"Georgia,serif",color:C.text,fontWeight:400}}>{arc.title||"Sin título"}</h3>
+                      </div>
+                      <div style={{display:"flex",gap:6}}>
+                        <button onClick={()=>setArcosForm({...arc})} style={{...ghostBtn,padding:"6px 12px",fontSize:12}}>✏ Editar</button>
+                        <button onClick={()=>delArco(arc.id)} style={{...ghostBtn,padding:"6px 12px",fontSize:12,color:C.red}}>✕</button>
+                      </div>
+                    </div>
+
+                    {/* Phase timeline */}
+                    <div style={{position:"relative",marginBottom:arc.notes?16:0}}>
+                      {/* Connector line */}
+                      <div style={{position:"absolute",top:20,left:20,right:20,height:2,background:`linear-gradient(90deg,${arcColor}44,${arcColor},${arcColor}44)`,zIndex:0}}/>
+                      <div style={{display:"grid",gridTemplateColumns:`repeat(${arc.phases?.length||5},1fr)`,gap:8,position:"relative",zIndex:1}}>
+                        {(arc.phases||[]).map((ph,i)=>(
+                          <div key={ph.id} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+                            <div style={{width:40,height:40,borderRadius:"50%",background:ph.desc?arcColor:C.bg,border:`2px solid ${ph.desc?arcColor:C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:ph.desc?"#fff":C.light,transition:"all .2s",flexShrink:0,boxShadow:ph.desc?`0 0 0 4px ${arcColor}22`:"none"}}>{i+1}</div>
+                            <div style={{textAlign:"center"}}>
+                              <div style={{fontSize:11,fontWeight:600,color:ph.desc?arcColor:C.light,fontFamily:"Georgia,serif",marginBottom:3}}>{ph.label}</div>
+                              {ph.desc?<div style={{fontSize:11,color:C.mid,fontFamily:"Georgia,serif",lineHeight:1.4,textAlign:"center"}}>{ph.desc.length>60?ph.desc.slice(0,59)+"…":ph.desc}</div>:<div style={{fontSize:10,color:C.light,fontStyle:"italic",fontFamily:"Georgia,serif"}}>Sin definir</div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {arc.notes&&<div style={{padding:"10px 14px",background:C.bg,borderRadius:10,fontSize:13,color:C.mid,fontFamily:"Georgia,serif",lineHeight:1.6,borderLeft:`2px solid ${arcColor}55`}}>{arc.notes}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* PLANNING */}
+        {view==="planning"&&(
+          <div style={{maxWidth:720}}>
+            <SecHdr title="Tablero de Capítulos" sub="Planifica el arco de tu novela." action={<button onClick={addCh} style={{...primBtn(false),padding:"9px 18px",fontSize:13}}>+ Capítulo</button>}/>
+            {chapters.length===0&&<div style={{...card,textAlign:"center",padding:48,color:C.light,fontFamily:"Georgia,serif"}}>Crea tu primer capítulo.</div>}
+            {chapters.map((ch,idx)=>{
+              const sc={done:C.green,wip:C.yellow,draft:C.light};
+              return(<div key={ch.id} style={{...card,marginBottom:10,padding:"14px 16px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                  <span style={{color:C.accent,fontSize:11,fontWeight:700,minWidth:22,fontFamily:"Georgia,serif"}}>{String(idx+1).padStart(2,"0")}</span>
+                  <input value={ch.title} onChange={e=>updCh(ch.id,{title:e.target.value})} style={{flex:1,background:"transparent",border:"none",borderBottom:`1px solid ${C.borderL}`,color:C.text,fontSize:14,padding:"3px 0",outline:"none",fontFamily:"Georgia,serif"}}/>
+                  <select value={ch.status} onChange={e=>updCh(ch.id,{status:e.target.value})} style={{background:sc[ch.status]+"18",border:`1px solid ${sc[ch.status]}33`,borderRadius:999,color:sc[ch.status],padding:"4px 10px",fontFamily:"Georgia,serif",fontSize:11,fontWeight:600,cursor:"pointer"}}>
+                    <option value="draft">○ Borrador</option><option value="wip">✏ En progreso</option><option value="done">✓ Listo</option>
+                  </select>
+                  <button onClick={()=>delCh(ch.id)} style={{background:"none",border:"none",cursor:"pointer",color:C.light,fontSize:14,padding:4}}>✕</button>
+                </div>
+                <textarea value={ch.notes||""} onChange={e=>updCh(ch.id,{notes:e.target.value})} placeholder="¿Qué ocurre? ¿Cuál es el giro?" style={{...fIn,minHeight:60,resize:"vertical",fontSize:13,color:C.mid}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+              </div>);
+            })}
+          </div>
+        )}
+
+        {/* ESCALETA */}
+        {view==="escaleta"&&(
+          <div style={{maxWidth:720}}>
+            <SecHdr title="La Escaleta" sub="Define cada escena antes de escribirla." action={<button onClick={()=>setEscaletaForm({...EE})} style={{...primBtn(false),padding:"9px 18px",fontSize:13}}>+ Escena</button>}/>
+            {escaleta.length===0&&<div style={{...card,textAlign:"center",padding:48,color:C.light,fontFamily:"Georgia,serif"}}>Sin escenas todavía.</div>}
+            {escaleta.map((e,i)=>(
+              <div key={e.id} style={{...card,marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{width:26,height:26,borderRadius:999,background:C.aLight,color:C.accent,fontSize:12,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{i+1}</span>
+                    <span style={{fontSize:14,fontWeight:600,color:C.text,fontFamily:"Georgia,serif"}}>{e.title||"Sin título"}</span>
+                  </div>
+                  <div style={{display:"flex",gap:5}}>
+                    <button onClick={()=>setEscaletaForm({...e})} style={{...ghostBtn,padding:"5px 10px",fontSize:12}}>✏</button>
+                    <button onClick={()=>delEsc(e.id)} style={{...ghostBtn,padding:"5px 10px",fontSize:12,color:C.red}}>✕</button>
+                  </div>
+                </div>
+                {e.summary&&<p style={{color:C.mid,fontSize:13,lineHeight:1.6,margin:"0 0 8px",fontFamily:"Georgia,serif"}}>{e.summary}</p>}
+                <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                  {e.goal&&<span style={{fontSize:11,color:C.green,fontFamily:"Georgia,serif"}}>🎯 {e.goal}</span>}
+                  {e.conflict&&<span style={{fontSize:11,color:C.red,fontFamily:"Georgia,serif"}}>⚔ {e.conflict}</span>}
+                  {e.hook&&<span style={{fontSize:11,color:C.accent,fontFamily:"Georgia,serif"}}>🎣 {e.hook}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* STRUCTURE */}
+        {view==="structure"&&(
+          <div style={{maxWidth:780}}>
+            <SecHdr title="Estructura Narrativa" sub="Los pilares que sostienen tu historia."/>
+            <div className="two-col" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+              {[
+                {k:"incitingIncident",t:"Incidente Incitador",ph:"La carta llega...",ai:"3 incidentes para:\n"+idea},
+                {k:"midpointTwist",t:"Punto de Giro Central",ph:"El twist...",ai:"3 puntos de giro para:\n"+idea},
+                {k:"darkNight",t:"Noche Oscura del Alma",ph:"Todo parece perdido...",ai:"Noche oscura:\n"+synopsis.slice(0,300)},
+                {k:"climax",t:"Clímax",ph:"El enfrentamiento final...",ai:"Clímax perfecto:\n"+synopsis.slice(0,300)},
+              ].map(f=>(
+                <div key={f.k} style={card}>
+                  <div style={{fontFamily:"Georgia,serif",fontSize:14,color:C.text,marginBottom:10,fontWeight:600}}>{f.t}</div>
+                  <textarea value={structure[f.k]||""} onChange={e=>saveStr({...structure,[f.k]:e.target.value})} placeholder={f.ph} style={{...fIn,minHeight:80,resize:"vertical",marginBottom:10}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+                  <AiBtn label="Generar" busy={busy&&aiField===f.k} onClick={()=>aiGen(f.ai,"Experto en estructura."+buildCtx(),v=>saveStr({...structure,[f.k]:v}),f.k)}/>
+                </div>
+              ))}
+            </div>
+            <div style={card}>
+              <div style={{fontFamily:"Georgia,serif",fontSize:14,marginBottom:8,fontWeight:600}}>Plot Twists</div>
+              <textarea value={structure.plotTwists||""} onChange={e=>saveStr({...structure,plotTwists:e.target.value})} placeholder="Lista todos los giros..." style={{...fIn,minHeight:100,resize:"vertical",marginBottom:10}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+              <AiBtn label="Generar 5 Plot Twists" busy={busy&&aiField==="twists"} onClick={()=>aiGen("5 plot twists para:\n"+idea,"Experto en giros."+buildCtx(),v=>saveStr({...structure,plotTwists:v}),"twists")}/>
+            </div>
+          </div>
+        )}
+
+        {/* CHARACTERS */}
+        {view==="characters"&&(
+          <div style={{maxWidth:860}}>
+            <SecHdr title="El Elenco" sub="Conoce a fondo a tus personajes." action={<button onClick={()=>setCharForm({...EC})} style={{...primBtn(false),padding:"9px 18px",fontSize:13}}>+ Personaje</button>}/>
+            {characters.length===0&&<div style={{...card,textAlign:"center",padding:48,color:C.light,fontFamily:"Georgia,serif"}}>El elenco está vacío.</div>}
+            <div className="two-col" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
+              {characters.map(ch=>(
+                <div key={ch.id} style={card}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                    <div><div style={{fontSize:16,fontFamily:"Georgia,serif",color:C.text,marginBottom:5}}>{ch.name||"Sin nombre"}</div><Tag color={NODE_C[ch.role]||C.light}>{ROLE_LBL[ch.role]}</Tag></div>
+                    <div style={{display:"flex",gap:5}}><button onClick={()=>setCharForm({...ch})} style={{...ghostBtn,padding:"5px 10px",fontSize:12}}>✏</button><button onClick={()=>delChar(ch.id)} style={{...ghostBtn,padding:"5px 10px",fontSize:12,color:C.red}}>✕</button></div>
+                  </div>
+                  {ch.appearance&&<p style={{color:C.mid,fontSize:13,lineHeight:1.5,marginBottom:10,fontFamily:"Georgia,serif"}}>{ch.appearance}</p>}
+                  {ch.fears&&<div style={{fontSize:12,fontFamily:"Georgia,serif",marginBottom:4}}><span style={{color:C.red,fontWeight:500}}>Miedo · </span><span style={{color:C.mid}}>{ch.fears}</span></div>}
+                  {ch.secret&&<div style={{fontSize:12,fontFamily:"Georgia,serif",marginBottom:4}}><span style={{color:"#8b5cf6",fontWeight:500}}>Secreto · </span><span style={{color:C.mid}}>{ch.secret}</span></div>}
+                  {(ch.arcStart||ch.arcEnd)&&<div style={{marginTop:6,padding:"7px 10px",background:C.aSoft,borderRadius:8,fontSize:12,fontFamily:"Georgia,serif"}}>
+                    <span style={{color:C.accent,fontWeight:500}}>Arco · </span><span style={{color:C.mid}}>{ch.arcStart}</span>
+                    {ch.arcStart&&ch.arcEnd&&<span style={{color:C.accent}}> → </span>}<span style={{color:C.text,fontWeight:500}}>{ch.arcEnd}</span>
+                  </div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* WORLD */}
+        {view==="world"&&(
+          <div style={{maxWidth:780}}>
+            <SecHdr title="Construcción del Mundo" sub="Las reglas y atmósfera de tu universo."/>
+            <div className="two-col" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+              {[{k:"genre",l:"Género y Ambientación",ph:"Fantasía oscura...",h:80},{k:"magicRules",l:"Reglas de Magia",ph:"La magia consume...",h:90},{k:"geography",l:"Geografía y Espacios",ph:"Tres reinos...",h:80},{k:"society",l:"Sociedad y Política",ph:"Jerarquía de castas...",h:80}].map(f=>(
+                <div key={f.k} style={card}>
+                  <label style={fLb}>{f.l}</label>
+                  <textarea value={worldData[f.k]||""} onChange={e=>saveWorld({...worldData,[f.k]:e.target.value})} placeholder={f.ph} style={{...fIn,minHeight:f.h,resize:"vertical",marginBottom:10}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+                  <AiBtn label="Expandir" busy={busy&&aiField===f.k} onClick={()=>aiGen("Expande "+f.l+" para:\n"+idea,"Worldbuilder."+buildCtx(),v=>saveWorld({...worldData,[f.k]:v}),f.k)}/>
+                </div>
+              ))}
+            </div>
+            <div style={{...card,marginTop:16}}>
+              <label style={fLb}>Atmósfera y Tono</label>
+              <textarea value={worldData.tone||""} onChange={e=>saveWorld({...worldData,tone:e.target.value})} placeholder="Oscura y melancólica..." style={{...fIn,minHeight:80,resize:"vertical",marginBottom:10}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+              <AiBtn label="Definir Tono" busy={busy&&aiField==="tone"} onClick={()=>aiGen("Tono para:\n"+idea,"Crítico literario."+buildCtx(),v=>saveWorld({...worldData,tone:v}),"tone")}/>
+            </div>
+          </div>
+        )}
+
+        {/* VOICE */}
+        {view==="voice"&&(
+          <div style={{maxWidth:780}}>
+            <SecHdr title="Voz y Técnica" sub="POV, tema y premisa de tu obra."/>
+            <div className="two-col" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+              <div style={card}>
+                <label style={{...fLb,marginBottom:12}}>Punto de Vista</label>
+                {[{id:"firstPerson",l:"1ª Persona",d:"«Yo caminé». Intimidad."},{id:"thirdClose",l:"3ª Cercana",d:"Acceso a pensamientos."},{id:"thirdOmni",l:"3ª Omnisciente",d:"Narrador lo sabe todo."},{id:"second",l:"2ª Persona",d:"«Caminas». Inmersivo."}].map(opt=>(
+                  <div key={opt.id} onClick={()=>saveStr({...structure,pov:opt.id})} style={{padding:"10px 12px",marginBottom:7,background:structure.pov===opt.id?C.aSoft:C.bg,border:`1.5px solid ${structure.pov===opt.id?C.accent:C.border}`,borderRadius:10,cursor:"pointer"}}>
+                    <div style={{fontSize:13,fontWeight:600,color:structure.pov===opt.id?C.accent:C.text,marginBottom:1,fontFamily:"Georgia,serif"}}>{opt.l}</div>
+                    <div style={{fontSize:11,color:C.light,fontStyle:"italic",fontFamily:"Georgia,serif"}}>{opt.d}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                <div style={card}>
+                  <label style={fLb}>El Tema</label>
+                  <textarea value={structure.theme||""} onChange={e=>saveStr({...structure,theme:e.target.value})} placeholder="'La soledad de quien no pertenece'..." style={{...fIn,minHeight:80,resize:"vertical",marginBottom:10}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+                  <AiBtn label="Descubrir Tema" busy={busy&&aiField==="theme"} onClick={()=>aiGen("Tema:\n"+idea,"Crítico literario."+buildCtx(),v=>saveStr({...structure,theme:v}),"theme")}/>
+                </div>
+                <div style={card}>
+                  <label style={fLb}>La Premisa</label>
+                  <textarea value={structure.premise||""} onChange={e=>saveStr({...structure,premise:e.target.value})} placeholder="Cuando [incidente], [protagonista] debe..." style={{...fIn,minHeight:70,resize:"vertical",marginBottom:10}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+                  <AiBtn label="Generar Premisa" busy={busy&&aiField==="premise"} onClick={()=>aiGen("Premisa:\n"+idea,"Experto en pitching."+buildCtx(),v=>saveStr({...structure,premise:v}),"premise")}/>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CODEX */}
+        {view==="codex"&&(
+          <div style={{maxWidth:720}}>
+            <SecHdr title="El Codex" sub="La IA lo consulta para mantener coherencia." action={<button onClick={()=>setCodexForm({name:"",type:"personaje",desc:""})} style={{...primBtn(false),padding:"9px 18px",fontSize:13}}>+ Añadir</button>}/>
+            {["personaje","lugar","objeto","mitología","otro"].map(type=>{
+              const entries=codex.filter(e=>e.type===type);if(!entries.length)return null;
+              return <div key={type} style={{marginBottom:20}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.light,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,fontFamily:"Georgia,serif"}}>{type}s</div>
+                {entries.map(e=><div key={e.id} style={{...card,marginBottom:8,display:"flex",gap:14,justifyContent:"space-between"}}>
+                  <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,fontFamily:"Georgia,serif",marginBottom:3}}>{e.name}</div><div style={{color:C.mid,fontSize:13,lineHeight:1.5,fontFamily:"Georgia,serif"}}>{e.desc}</div></div>
+                  <div style={{display:"flex",gap:5,flexShrink:0}}><button onClick={()=>setCodexForm({...e})} style={{...ghostBtn,padding:"5px 10px",fontSize:12}}>✏</button><button onClick={()=>delCodex(e.id)} style={{...ghostBtn,padding:"5px 10px",fontSize:12,color:C.red}}>✕</button></div>
+                </div>)}
+              </div>;
+            })}
+            {codex.length===0&&<div style={{...card,textAlign:"center",padding:48,color:C.light,fontFamily:"Georgia,serif"}}>El Codex está vacío.</div>}
+          </div>
+        )}
+
+        {/* LOREBOOK */}
+        {view==="lorebook"&&(
+          <div style={{maxWidth:720}}>
+            <SecHdr title="Lorebook" sub="La IA activa entradas cuando detecta palabras clave." action={<button onClick={()=>setLbForm({name:"",kws:"",content:""})} style={{...primBtn(false),padding:"9px 18px",fontSize:13}}>+ Añadir</button>}/>
+            {lorebook.map(e=>(
+              <div key={e.id} style={{...card,marginBottom:10,display:"flex",gap:14,justifyContent:"space-between"}}>
+                <div style={{flex:1}}><div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>{(e.keywords||[]).map(kw=><Tag key={kw}>{kw}</Tag>)}</div><div style={{color:C.mid,fontSize:13,lineHeight:1.5,fontFamily:"Georgia,serif"}}>{e.content}</div></div>
+                <div style={{display:"flex",gap:5,flexShrink:0}}><button onClick={()=>setLbForm({...e,kws:(e.keywords||[]).join(", ")})} style={{...ghostBtn,padding:"5px 10px",fontSize:12}}>✏</button><button onClick={()=>delLb(e.id)} style={{...ghostBtn,padding:"5px 10px",fontSize:12,color:C.red}}>✕</button></div>
+              </div>
+            ))}
+            {lorebook.length===0&&<div style={{...card,textAlign:"center",padding:48,color:C.light,fontFamily:"Georgia,serif"}}>El Lorebook está vacío.</div>}
+          </div>
+        )}
+
+        {/* IMPORTAR */}
+        {view==="importar"&&(
+          <div style={{maxWidth:720}}>
+            <SecHdr title="Importar" sub="La IA analiza y distribuye el contenido."/>
+            {impStep===0&&(<div>
+              <div style={{...card,marginBottom:16,border:`2px dashed ${C.border}`,borderRadius:18,padding:32,textAlign:"center",background:C.bg}}>
+                <div style={{fontSize:32,marginBottom:10}}>📂</div>
+                <div style={{fontSize:15,fontFamily:"Georgia,serif",color:C.text,marginBottom:16}}>Sube archivos .txt, .md o .docx</div>
+                <label style={{...primBtn(false),display:"inline-flex",cursor:"pointer"}}>Seleccionar<input type="file" multiple accept=".txt,.md,.docx,.rtf" onChange={handleImpFiles} style={{display:"none"}}/></label>
+              </div>
+              {impFiles.length>0&&(<div style={{...card,marginBottom:16,padding:0,overflow:"hidden"}}>
+                {impFiles.map((f,i)=>(<div key={i} style={{padding:"12px 18px",borderBottom:i<impFiles.length-1?"1px solid "+C.borderL:"none",display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:18}}>{f.name.endsWith(".docx")?"📄":"📃"}</span>
+                  <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,color:C.text,fontFamily:"Georgia,serif"}}>{f.name}</div>{f.ok?<div style={{fontSize:11,color:C.light,fontFamily:"Georgia,serif"}}>{f.text.length.toLocaleString()} chars</div>:<div style={{fontSize:11,color:C.red}}>Error</div>}</div>
+                  <button onClick={()=>setImpFiles(p=>p.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:C.light,cursor:"pointer",fontSize:15,padding:4}}>✕</button>
+                </div>))}
+              </div>)}
+              <div style={card}>
+                <Fld label="O pega texto directamente" value={impText} onChange={setImpText} ph="Notas, fichas, worldbuilding..." ta h={140}/>
+                <div style={{display:"flex",justifyContent:"flex-end"}}>
+                  <button onClick={processImport} disabled={impBusy||(!impText.trim()&&!impFiles.some(f=>f.ok))} style={primBtn(impBusy||(!impText.trim()&&!impFiles.some(f=>f.ok)))}>✦ Analizar →</button>
+                </div>
+              </div>
+            </div>)}
+            {impStep===1&&<div style={{...card,padding:60,textAlign:"center"}}><div style={{fontSize:40,marginBottom:16}}>🔍</div><div style={{fontFamily:"Georgia,serif",fontSize:20,color:C.text}}>Analizando con IA…</div></div>}
+            {impStep===3&&<div style={{...card,padding:48,textAlign:"center"}}><div style={{fontSize:40,marginBottom:12}}>⚠️</div><div style={{fontFamily:"Georgia,serif",fontSize:18,color:C.text,marginBottom:16}}>{impError}</div><button onClick={()=>{setImpStep(0);setImpError(null);}} style={primBtn(false)}>← Reintentar</button></div>}
+            {impStep===2&&impExtracted&&(<div>
+              <div style={{...card,marginBottom:20,padding:"14px 20px",background:C.aSoft,border:`1px solid ${C.accent}33`}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18}}>✦</span><span style={{fontFamily:"Georgia,serif",fontSize:15,color:C.text}}>Análisis listo — selecciona qué importar</span></div>
+              </div>
+              <div className="two-col" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
+                {[
+                  {k:"idea",label:"💡 Idea",count:impExtracted.idea?.trim()?1:0,preview:impExtracted.idea?.substring(0,80)},
+                  {k:"synopsis",label:"📄 Sinopsis",count:impExtracted.synopsis?.trim()?1:0,preview:impExtracted.synopsis?.substring(0,80)},
+                  {k:"characters",label:"👤 Personajes",count:impExtracted.characters?.length||0,preview:impExtracted.characters?.map(c=>c.name).filter(Boolean).join(", ")},
+                  {k:"worldData",label:"🌍 Worldbuilding",count:Object.values(impExtracted.worldData||{}).filter(v=>v?.trim()).length,preview:impExtracted.worldData?.genre||""},
+                  {k:"codex",label:"📚 Codex",count:impExtracted.codex?.length||0,preview:impExtracted.codex?.map(c=>c.name).filter(Boolean).join(", ")},
+                  {k:"lorebook",label:"🔑 Lorebook",count:impExtracted.lorebook?.length||0,preview:impExtracted.lorebook?.map(e=>(e.keywords||[])[0]).filter(Boolean).join(", ")},
+                  {k:"structure",label:"🏗 Estructura",count:["premise","theme","incitingIncident","midpointTwist","darkNight","climax","plotTwists"].filter(k=>impExtracted.structure?.[k]?.trim()).length,preview:impExtracted.structure?.premise||""},
+                  {k:"escaleta",label:"≡ Escaleta",count:impExtracted.escaleta?.length||0,preview:impExtracted.escaleta?.map(e=>e.title).filter(Boolean).join(", ")},
+                  {k:"manuscript",label:"✍ Manuscrito",count:impExtracted.manuscript?.trim()?1:0,preview:impExtracted.manuscript?.substring(0,80)},
+                ].filter(s=>s.count>0).map(s=>(
+                  <div key={s.k} onClick={()=>setImpSel(p=>({...p,[s.k]:!p[s.k]}))} style={{...card,cursor:"pointer",border:`2px solid ${impSel[s.k]?C.accent:C.border}`,background:impSel[s.k]?C.aSoft:C.surface,padding:14}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                      <div style={{fontSize:13,fontWeight:600,color:impSel[s.k]?C.accent:C.text,fontFamily:"Georgia,serif"}}>{s.label} <span style={{fontSize:10,fontWeight:400,color:C.light}}>({s.count})</span></div>
+                      <div style={{width:18,height:18,borderRadius:999,border:`2px solid ${impSel[s.k]?C.accent:C.border}`,background:impSel[s.k]?C.accent:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{impSel[s.k]&&<span style={{color:"#fff",fontSize:10,fontWeight:700}}>✓</span>}</div>
+                    </div>
+                    {s.preview&&<p style={{fontSize:11,color:C.light,margin:0,lineHeight:1.4,fontFamily:"Georgia,serif"}}>{s.preview}{(s.preview?.length||0)>=80?"…":""}</p>}
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:10,justifyContent:"flex-end",flexWrap:"wrap"}}>
+                <button onClick={()=>{setImpStep(0);setImpExtracted(null);}} style={ghostBtn}>← Volver</button>
+                <button onClick={()=>setImpSel(Object.fromEntries(Object.keys(impSel).map(k=>[k,true])))} style={ghostBtn}>Todo</button>
+                <button onClick={applyImport} disabled={!Object.values(impSel).some(Boolean)} style={primBtn(!Object.values(impSel).some(Boolean))}>✓ Importar →</button>
+              </div>
+            </div>)}
+          </div>
+        )}
+
+        {/* PUBLICAR */}
+        {view==="publicar"&&(
+          <div style={{maxWidth:880}}>
+            <SecHdr title="Publicar" sub="Adapta tu texto a cualquier plataforma."/>
+            <div className="four-col" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:8,marginBottom:28}}>
+              {PUB_FORMATS.map(f=>(
+                <div key={f.id} onClick={()=>{setPubFormat(f.id);setPubResult("");setPubOpts({tone:"",audience:"",selOpt:f.optList[0],chapterSel:0});}}
+                  style={{...card,cursor:"pointer",border:`2px solid ${pubFormat===f.id?f.color:C.border}`,background:pubFormat===f.id?f.color+"08":C.surface,padding:12}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                    <div style={{width:30,height:30,borderRadius:8,background:f.color+"18",border:`1px solid ${f.color}33`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{f.icon}</div>
+                    <div style={{fontSize:12,fontWeight:600,color:pubFormat===f.id?f.color:C.text,lineHeight:1.3,fontFamily:"Georgia,serif"}}>{f.label}</div>
+                  </div>
+                  <p style={{fontSize:10,color:C.light,margin:0,lineHeight:1.4,fontFamily:"Georgia,serif"}}>{f.desc.substring(0,55)}…</p>
+                </div>
+              ))}
+            </div>
+            {pubFormat&&(()=>{
+              const fmt=PUB_FORMATS.find(f=>f.id===pubFormat);const srcTxt=getSourceText();
+              return(
+                <div className="pub-layout" style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:20,alignItems:"start"}}>
+                  <div style={{...card,borderTop:`3px solid ${fmt.color}`}}>
+                    <div style={{fontSize:11,fontWeight:700,color:C.light,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:10,fontFamily:"Georgia,serif"}}>{fmt.icon} {fmt.label}</div>
+                    <label style={fLb}>Fuente</label>
+                    <select value={pubSource} onChange={e=>setPubSource(e.target.value)} style={{...fIn,marginBottom:12,fontSize:14}}>
+                      <option value="manuscript">Manuscrito</option><option value="prose">Prosa del Engine</option><option value="synopsis">Sinopsis</option>
+                      {chapters.length>0&&<option value="chapter">Un capítulo</option>}
+                    </select>
+                    <label style={fLb}>Opción</label>
+                    <select value={pubOpts.selOpt||fmt.optList[0]} onChange={e=>setPubOpts(p=>({...p,selOpt:e.target.value}))} style={{...fIn,marginBottom:12,fontSize:14}}>{fmt.optList.map(o=><option key={o} value={o}>{o}</option>)}</select>
+                    <label style={fLb}>Tono</label>
+                    <input value={pubOpts.tone||""} onChange={e=>setPubOpts(p=>({...p,tone:e.target.value}))} placeholder="oscuro, esperanzador..." style={{...fIn,marginBottom:14,fontSize:14}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+                    <div style={{padding:"8px 12px",background:C.bg,borderRadius:10,marginBottom:12,fontSize:12,color:C.mid,fontFamily:"Georgia,serif"}}>{srcTxt.split(/\s+/).filter(Boolean).length} palabras</div>
+                    <button onClick={generatePublication} disabled={pubBusy||!srcTxt.trim()} style={{...primBtn(pubBusy||!srcTxt.trim()),width:"100%",justifyContent:"center",background:pubBusy||!srcTxt.trim()?"#e5e0f5":fmt.color,boxShadow:pubBusy||!srcTxt.trim()?"none":"0 4px 14px "+fmt.color+"55"}}>
+                      {pubBusy?"⏳ Adaptando...":"✦ Adaptar"}
+                    </button>
+                  </div>
+                  <div>
+                    {pubResult?(
+                      <div style={card}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+                          <div style={{fontSize:14,fontWeight:600,color:C.text,fontFamily:"Georgia,serif"}}>{fmt.label} · {pubResult.split(/\s+/).filter(Boolean).length}p</div>
+                          <div style={{display:"flex",gap:7}}>
+                            <button onClick={copyPub} style={{...ghostBtn,borderColor:pubCopied?C.green:C.border,color:pubCopied?C.green:C.mid,fontSize:12}}>{pubCopied?"✓ Copiado":"⎘ Copiar"}</button>
+                            <button onClick={downloadPub} style={{...ghostBtn,fontSize:12}}>⬇ .txt</button>
+                          </div>
+                        </div>
+                        <div style={{background:C.bg,borderRadius:12,padding:"20px 22px",fontSize:15,lineHeight:1.9,color:C.text,fontFamily:"Georgia,serif",whiteSpace:"pre-wrap",border:`1px solid ${C.borderL}`,maxHeight:500,overflowY:"auto"}}>{pubResult}</div>
+                      </div>
+                    ):(
+                      <div style={{...card,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:300,textAlign:"center",border:`2px dashed ${C.border}`,background:C.bg}}>
+                        <div style={{fontSize:40,marginBottom:12}}>{fmt.icon}</div>
+                        <div style={{fontFamily:"Georgia,serif",fontSize:16,color:C.text}}>{fmt.label}</div>
+                        <div style={{fontSize:12,color:C.light,maxWidth:260,lineHeight:1.6,fontFamily:"Georgia,serif",marginTop:6}}>{fmt.desc}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+            {!pubFormat&&<div style={{...card,padding:40,textAlign:"center",background:C.bg,border:`2px dashed ${C.border}`}}><div style={{fontSize:36,marginBottom:10}}>🖨️</div><div style={{fontFamily:"Georgia,serif",fontSize:16,color:C.text}}>Selecciona un formato arriba</div></div>}
+          </div>
+        )}
+      </div>
+
+      {/* ── SYNC BADGE ── */}
+      <SyncBadge status={syncStatus} savedAt={savedAt} isMobile={isMobile}/>
+
+      {/* ── TOAST ── */}
+      {toast&&<div style={{position:"fixed",bottom:isMobile?70:24,left:"50%",transform:"translateX(-50%)",background:C.accent,color:"#fff",padding:"12px 20px",borderRadius:999,fontSize:13,fontFamily:"Georgia,serif",fontWeight:600,boxShadow:"0 8px 32px rgba(124,58,237,0.35)",zIndex:2000,whiteSpace:"nowrap"}}>{toast}</div>}
+
+      {/* ── SETTINGS ── */}
+      {showSettings&&<SettingsModal user={user} currentKey={apiKey} onSave={handleSaveApiKey} onClose={()=>setShowSettings(false)}/>}
+
+      {/* ── AI MODAL ── */}
+      {modal&&(
+        <Modal title={modal.type==="describe"?"Opciones Sensoriales":"Reescritura"} sub={modal.type==="rewrite"?"Modo: "+modal.mode:undefined} onClose={()=>setModal(null)} wide>
+          {busy&&<div style={{textAlign:"center",padding:40,color:C.mid,fontFamily:"Georgia,serif"}}>⏳ Generando…</div>}
+          {modal.type==="describe"&&modal.results&&!busy&&(
+            <div>
+              <div style={{padding:"10px 14px",background:C.bg,borderRadius:10,marginBottom:16,fontSize:13,color:C.mid,fontStyle:"italic",fontFamily:"Georgia,serif"}}>«{modal.original?.substring(0,60)}{modal.original?.length>60?"…":""}»</div>
+              {modal.results.error?<div style={{color:C.red,fontFamily:"Georgia,serif"}}>{modal.results.error}</div>:
+                Object.entries(modal.results).map(([sense,text])=>(
+                  <div key={sense} style={{marginBottom:10}}>
+                    <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",color:senseC[sense]||C.accent,marginBottom:5,fontFamily:"Georgia,serif"}}>{senseI[sense]} {sense}</div>
+                    <div onClick={()=>insertResult(text)} style={{padding:"12px 16px",background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:12,cursor:"pointer",fontSize:14,lineHeight:1.7,fontFamily:"Georgia,serif"}} onMouseEnter={e=>e.currentTarget.style.borderColor=C.accent} onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>{text}</div>
+                  </div>
+                ))
+              }
+            </div>
+          )}
+          {modal.type==="rewrite"&&modal.results&&!busy&&(
+            <div>
+              <div style={{padding:"10px 14px",background:C.bg,borderRadius:10,marginBottom:14,fontSize:13,color:C.mid,fontStyle:"italic",fontFamily:"Georgia,serif"}}>«{modal.original?.substring(0,70)}{modal.original?.length>70?"…":""}»</div>
+              <div style={{padding:18,background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:12,fontSize:15,lineHeight:1.9,fontFamily:"Georgia,serif",marginBottom:16}}>{modal.results}</div>
+              <button onClick={()=>insertResult(modal.results)} style={{...primBtn(false),width:"100%",justifyContent:"center"}}>✓ Reemplazar texto</button>
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* ── CHARACTER FORM ── */}
+      {charForm&&(
+        <Modal title={charForm.id?"Editar Personaje":"Nuevo Personaje"} onClose={()=>setCharForm(null)} wide>
+          <div className="two-col" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+            <div><label style={fLb}>Nombre *</label><input value={charForm.name} onChange={e=>setCharForm(f=>({...f,name:e.target.value}))} style={{...fIn,fontSize:15}} placeholder="Lyra..." onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/></div>
+            <div><label style={fLb}>Rol</label><select value={charForm.role} onChange={e=>setCharForm(f=>({...f,role:e.target.value}))} style={{...fIn,fontSize:15}}><option value="protagonist">Protagonista</option><option value="antagonist">Antagonista</option><option value="secondary">Secundario</option><option value="mentor">Mentor</option><option value="other">Otro</option></select></div>
+            <div style={{gridColumn:"1/-1"}}><Fld label="Apariencia" value={charForm.appearance||""} onChange={v=>setCharForm(f=>({...f,appearance:v}))} ph="28 años. Ojos verdes..." ta h={70}/></div>
+            <div><label style={fLb}>😨 Miedo</label><textarea value={charForm.fears||""} onChange={e=>setCharForm(f=>({...f,fears:e.target.value}))} style={{...fIn,minHeight:68,resize:"vertical",marginBottom:8,fontSize:14}} placeholder="Convertirse en..." onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/><AiBtn label="Sugerir" busy={busy&&aiField==="cfear"} onClick={()=>aiGen("3 miedos para "+(charForm.name||"personaje")+":\n"+idea,"Psicólogo narrativo.",v=>setCharForm(f=>({...f,fears:v})),"cfear")}/></div>
+            <div><label style={fLb}>🤫 Secreto</label><textarea value={charForm.secret||""} onChange={e=>setCharForm(f=>({...f,secret:e.target.value}))} style={{...fIn,minHeight:68,resize:"vertical",marginBottom:8,fontSize:14}} placeholder="En el pasado..." onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/><AiBtn label="Sugerir" busy={busy&&aiField==="csec"} onClick={()=>aiGen("3 secretos para "+(charForm.name||"personaje")+":\n"+idea,"Dramaturgo.",v=>setCharForm(f=>({...f,secret:v})),"csec")}/></div>
+            <div style={{gridColumn:"1/-1"}}><label style={fLb}>👻 Fantasma (herida de origen)</label><textarea value={charForm.ghost||""} onChange={e=>setCharForm(f=>({...f,ghost:e.target.value}))} style={{...fIn,minHeight:68,resize:"vertical",marginBottom:8,fontSize:14}} placeholder="De niño..." onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/><AiBtn label="Sugerir" busy={busy&&aiField==="cghost"} onClick={()=>aiGen("Herida de origen para "+(charForm.name||"personaje")+":\n"+idea,"Psicólogo narrativo.",v=>setCharForm(f=>({...f,ghost:v})),"cghost")}/></div>
+            <div style={{gridColumn:"1/-1",background:C.aSoft,border:`1px solid ${C.accent}22`,borderRadius:14,padding:16}}>
+              <label style={{...fLb,color:C.accent,marginBottom:10}}>🌱 Arco de Transformación</label>
+              <div className="two-col" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={fLb}>Inicio</label><input value={charForm.arcStart||""} onChange={e=>setCharForm(f=>({...f,arcStart:e.target.value}))} style={{...fIn,fontSize:14}} placeholder="Cobarde..." onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/></div>
+                <div><label style={fLb}>Final</label><input value={charForm.arcEnd||""} onChange={e=>setCharForm(f=>({...f,arcEnd:e.target.value}))} style={{...fIn,fontSize:14}} placeholder="Valiente..." onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/></div>
+              </div>
+              <Fld label="¿Cómo se transforma?" value={charForm.arcHow||""} onChange={v=>setCharForm(f=>({...f,arcHow:v}))} ph="El viaje le obliga a..." ta h={64}/>
+              <AiBtn label="Generar Arco" busy={busy&&aiField==="carc"} onClick={()=>aiGen("Arco para "+(charForm.name||"personaje")+":\n"+idea,"Experto en arcos.",v=>setCharForm(f=>({...f,arcHow:v})),"carc")}/>
+            </div>
+            <div style={{gridColumn:"1/-1"}}><button onClick={()=>saveChar(charForm)} disabled={!charForm.name.trim()} style={{...primBtn(!charForm.name.trim()),width:"100%",justifyContent:"center",padding:"13px"}}>Guardar Personaje</button></div>
+          </div>
+        </Modal>
+      )}
+
+      {codexForm&&<Modal title={codexForm.id?"Editar":"Nueva entrada"} onClose={()=>setCodexForm(null)}>
+        <Fld label="Nombre" value={codexForm.name} onChange={v=>setCodexForm(f=>({...f,name:v}))} ph="El Arma Prohibida"/>
+        <div style={{marginBottom:16}}><label style={fLb}>Tipo</label><select value={codexForm.type} onChange={e=>setCodexForm(f=>({...f,type:e.target.value}))} style={{...fIn,fontSize:15}}>{["personaje","lugar","objeto","mitología","otro"].map(t=><option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}</select></div>
+        <Fld label="Descripción" value={codexForm.desc||""} onChange={v=>setCodexForm(f=>({...f,desc:v}))} ta h={110} ph="Descripción detallada..."/>
+        <button onClick={()=>saveCodex(codexForm)} disabled={!codexForm.name.trim()} style={{...primBtn(!codexForm.name.trim()),width:"100%",justifyContent:"center",padding:"13px"}}>Guardar</button>
+      </Modal>}
+
+      {lbForm&&<Modal title={lbForm.id?"Editar":"Nueva entrada"} onClose={()=>setLbForm(null)}>
+        <Fld label="Palabras clave (separadas por coma)" value={lbForm.kws||""} onChange={v=>setLbForm(f=>({...f,kws:v}))} ph="Reino, Aldara, la Reina"/>
+        <Fld label="Información contextual" value={lbForm.content||""} onChange={v=>setLbForm(f=>({...f,content:v}))} ta h={130} ph="Todo lo que la IA debe saber..."/>
+        <button onClick={()=>saveLb(lbForm)} disabled={!lbForm.kws?.trim()} style={{...primBtn(!lbForm.kws?.trim()),width:"100%",justifyContent:"center",padding:"13px"}}>Guardar</button>
+      </Modal>}
+
+      {escaletaForm&&<Modal title={escaletaForm.id?"Editar Escena":"Nueva Escena"} onClose={()=>setEscaletaForm(null)}>
+        <Fld label="Título" value={escaletaForm.title} onChange={v=>setEscaletaForm(f=>({...f,title:v}))} ph="La revelación en el castillo..."/>
+        <Fld label="¿Qué ocurre?" value={escaletaForm.summary||""} onChange={v=>setEscaletaForm(f=>({...f,summary:v}))} ta h={75} ph="Lyra descubre..."/>
+        <Fld label="Objetivo del personaje" value={escaletaForm.goal||""} onChange={v=>setEscaletaForm(f=>({...f,goal:v}))} ph="Conseguir la llave..."/>
+        <Fld label="Conflicto" value={escaletaForm.conflict||""} onChange={v=>setEscaletaForm(f=>({...f,conflict:v}))} ph="El guardián sabe su secreto..."/>
+        <Fld label="Gancho final" value={escaletaForm.hook||""} onChange={v=>setEscaletaForm(f=>({...f,hook:v}))} ph="Encuentra la carta..."/>
+        <button onClick={()=>saveEsc(escaletaForm)} disabled={!escaletaForm.title.trim()} style={{...primBtn(!escaletaForm.title.trim()),width:"100%",justifyContent:"center",padding:"13px"}}>Guardar Escena</button>
+      </Modal>}
+
+      {addNodeForm&&<Modal title="Añadir Nodo" onClose={()=>setAddNodeForm(null)}>
+        <Fld label="Etiqueta" value={addNodeForm.label} onChange={v=>setAddNodeForm(f=>({...f,label:v}))} ph="El Pacto..."/>
+        <button onClick={()=>saveMapNode(addNodeForm)} disabled={!addNodeForm.label.trim()} style={{...primBtn(!addNodeForm.label.trim()),width:"100%",justifyContent:"center"}}>Añadir</button>
+      </Modal>}
+
+      {/* ARCO FORM */}
+      {arcosForm&&(
+        <Modal title={arcosForm.id?"Editar Arco":"Nuevo Arco Argumental"} onClose={()=>setArcosForm(null)} wide>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:4}} className="two-col">
+            <div>
+              <label style={fLb}>Título del arco</label>
+              <input value={arcosForm.title} onChange={e=>setArcosForm(f=>({...f,title:e.target.value}))} placeholder="El viaje de Lyra, La traición del maestro..." style={{...fIn,fontSize:15,marginBottom:14}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+              <label style={fLb}>Tipo de arco</label>
+              <select value={arcosForm.type} onChange={e=>setArcosForm(f=>({...f,type:e.target.value}))} style={{...fIn,marginBottom:14,fontSize:14}}>
+                <option value="principal">Principal — el motor de toda la historia</option>
+                <option value="personaje">De personaje — transformación interna</option>
+                <option value="secundario">Secundario — trama paralela importante</option>
+                <option value="subtrama">Subtrama — hilo secundario</option>
+                <option value="romance">Romántico</option>
+              </select>
+              <label style={fLb}>Personajes involucrados</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
+                {characters.map(c=>{
+                  const sel=(arcosForm.characters||[]).includes(c.name);
+                  return <div key={c.id} onClick={()=>setArcosForm(f=>({...f,characters:sel?(f.characters||[]).filter(x=>x!==c.name):[...(f.characters||[]),c.name]}))}
+                    style={{padding:"5px 12px",borderRadius:999,border:`1px solid ${sel?C.accent:C.border}`,background:sel?C.aLight:C.surface,color:sel?C.accent:C.mid,cursor:"pointer",fontSize:12,fontFamily:"Georgia,serif",fontWeight:sel?600:400}}>
+                    {c.name}
+                  </div>;
+                })}
+                {characters.length===0&&<span style={{fontSize:12,color:C.light,fontFamily:"Georgia,serif"}}>Añade personajes en la sección Personajes</span>}
+              </div>
+            </div>
+            <div>
+              <label style={fLb}>Notas generales del arco</label>
+              <textarea value={arcosForm.notes||""} onChange={e=>setArcosForm(f=>({...f,notes:e.target.value}))} placeholder="¿Qué pregunta responde este arco? ¿Qué cambia al final?..." style={{...fIn,minHeight:120,resize:"vertical",marginBottom:14}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+              <div style={{padding:"10px 14px",background:C.aSoft,borderRadius:10,fontSize:12,color:C.mid,fontFamily:"Georgia,serif",lineHeight:1.6}}>
+                💡 Después de crear el arco, podrás editar cada fase de la línea de tiempo haciendo clic en "Editar".
+              </div>
+            </div>
+          </div>
+
+          {/* Phase editor */}
+          <div style={{marginTop:20,marginBottom:20}}>
+            <label style={{...fLb,marginBottom:14}}>Fases del arco — rellena las que ya tengas claras</label>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {(arcosForm.phases||EAR.phases).map((ph,i)=>(
+                <div key={ph.id} style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                  <div style={{width:32,height:32,borderRadius:"50%",background:ph.desc?C.accent:C.bg,border:`2px solid ${ph.desc?C.accent:C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:ph.desc?"#fff":C.light,flexShrink:0,marginTop:2}}>{i+1}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,fontWeight:600,color:C.mid,fontFamily:"Georgia,serif",marginBottom:4}}>{ph.label}</div>
+                    <textarea value={ph.desc||""} onChange={e=>{
+                      const phases=(arcosForm.phases||EAR.phases).map((p,j)=>j===i?{...p,desc:e.target.value}:p);
+                      setArcosForm(f=>({...f,phases}));
+                    }} placeholder={["¿Qué desencadena este arco?","¿Cómo escala la tensión?","¿Cuál es el punto de no retorno?","¿En qué momento todo parece perdido?","¿Cómo y con qué consecuencias se resuelve?"][i]} style={{...fIn,minHeight:52,resize:"vertical",fontSize:13}} onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={()=>arcosForm.title.trim()&&saveArco(arcosForm)} disabled={!arcosForm.title.trim()} style={{...primBtn(!arcosForm.title.trim()),width:"100%",justifyContent:"center",padding:"13px"}}>
+            {arcosForm.id?"Guardar cambios":"Crear arco argumental"}
+          </button>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
